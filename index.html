@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MusicRank</title>
+<meta name="description" content="Listen through an artist's entire discography and rank every album and song.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a href="#" class="logo" id="home">Music<span>Rank</span></a>
+  <form id="searchForm" class="search">
+    <input id="q" type="search" placeholder="Search an artist…" autocomplete="off" required>
+    <button>Search</button>
+  </form>
+</header>
+
+<main id="view"></main>
+
+<div id="player" class="player hidden">
+  <img id="pArt" alt="">
+  <div class="pMeta"><div id="pTitle"></div><div id="pSub"></div></div>
+  <button id="pToggle" class="pBtn">❚❚</button>
+  <div class="pBar"><div id="pProg"></div></div>
+  <audio id="audio"></audio>
+</div>
+
+<footer class="foot">Data &amp; 30-second previews via the iTunes Search API. Rankings are saved in your browser.</footer>
+<script src="app.js"></script>
+</body>
+</html>
