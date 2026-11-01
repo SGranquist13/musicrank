@@ -153,6 +153,7 @@ audio.ontimeupdate = () => { $('#pProg').style.width = (audio.currentTime / (aud
 $('#pToggle').onclick = () => audio.paused ? audio.play() : audio.pause();
 
 // ---------- tier buttons (tap while you listen) ----------
+const tbadge = (st, kind, id) => { const t = tierOf(st, kind, id); return `<span class="tbadge ${t ? 't-' + t : ''}">${t || '–'}</span>`; };
 const tierBtns = (st, kind, id) => `<div class="tierbtns" data-kind="${kind}" data-id="${id}">${TIERS.map(t =>
   `<button class="t-${t} ${tierOf(st, kind, id) === t ? 'on' : ''}" data-tier="${t}">${t}</button>`).join('')}</div>`;
 function wireTierBtns(root, st, after) {
@@ -163,6 +164,8 @@ function wireTierBtns(root, st, after) {
     setTier(st, kind, id, t);
     if (kind === 'songs') st.listened[id] = true;
     box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.tier === t));
+    const badge = box.closest('.row')?.querySelector('.tbadge');
+    if (badge) { badge.className = `tbadge ${t ? 't-' + t : ''}`; badge.textContent = t || '–'; }
     after?.();
   });
 }
@@ -354,7 +357,7 @@ async function artistPage(id, tab = 'albums', sub) {
       <ul class="list">${list.map((a, i) => `<li class="row" draggable="true" data-id="${a.collectionId}">
         <span class="handle">⋮⋮</span><span class="rk">${i + 1}</span><img loading="lazy" src="${esc(art(a.artworkUrl100, 100))}" alt="">
         <div class="info"><div><a href="#/album/${id}/${a.collectionId}">${esc(a.collectionName)}</a></div><div class="s">${year(a.releaseDate)}</div></div>
-        ${tierBtns(st, 'albums', a.collectionId)}${ctl}</li>`).join('')}</ul>`;
+        ${tierBtns(st, 'albums', a.collectionId)}${ctl}${tbadge(st, 'albums', a.collectionId)}</li>`).join('')}</ul>`;
     if (!st.albumOrder.length) { st.albumOrder = list.map(a => String(a.collectionId)); save(); }
     sortable($('.list', el), o => { st.albumOrder = o; save(); snapshot(st, main); });
     wireTierBtns(el, st, () => snapshot(st, main));
@@ -422,7 +425,7 @@ function songRow(t, i, st, showAlbum) {
     ${showAlbum ? `<img loading="lazy" src="${esc(art(t.artworkUrl100, 100))}" alt="">` : ''}
     <div class="info"><div>${esc(t.trackName)}</div><div class="s">${showAlbum ? esc(t.collectionName) + ' · ' : ''}${fmt(t.trackTimeMillis)}</div></div>
     ${t.previewUrl ? `<button class="play" data-id="${t.trackId}" title="30s preview">▶</button>` : ''}
-    ${tierBtns(st, 'songs', t.trackId)}${ctl}</li>`;
+    ${tierBtns(st, 'songs', t.trackId)}${ctl}${tbadge(st, 'songs', t.trackId)}</li>`;
 }
 function wireSongRows(ul, tracks, st, after) {
   ul.addEventListener('click', e => { const p = e.target.closest('.play'); if (p) play(tracks.find(t => t.trackId === +p.dataset.id)); });
@@ -468,6 +471,50 @@ async function albumPage(artistId, cid) {
   wireTierBtns($('.verdict'), st, () => { $('#cnt').innerHTML = verdict(); snapshot(st, main); });
 }
 
+// ---------- mobile: tap a row to open a rating sheet ----------
+// The sheet drives the row's own (hidden) tier/move buttons, so all saving logic stays in one place.
+const isPhone = () => matchMedia('(max-width: 600px)').matches;
+let sheetRow = null;
+function openSheet(row) {
+  sheetRow = row;
+  const sheet = $('#sheet'), img = row.querySelector('img'), info = row.querySelector('.info');
+  const box = row.querySelector('.tierbtns'), cur = tierOf(artistState(location.hash.split('/')[2]), box.dataset.kind, box.dataset.id);
+  const list = row.parentNode, idx = [...list.children].indexOf(row);
+  sheet.querySelector('.sh-head').innerHTML = `${img ? `<img src="${img.src.replace('100x100', '300x300')}" alt="">` : ''}
+    <div><div class="sh-title">${info.firstElementChild.innerHTML}</div><div class="muted">${info.lastElementChild.innerHTML}</div>
+    <div class="muted small">Ranked #${idx + 1} of ${list.children.length}</div></div>`;
+  sheet.querySelector('.sh-tiers').innerHTML = TIERS.map(t => `<button class="t-${t} ${cur === t ? 'on' : ''}" data-tier="${t}">${t}</button>`).join('');
+  const play = row.querySelector('.play');
+  sheet.querySelector('[data-sh="play"]').hidden = !play;
+  sheet.querySelector('[data-sh="prev"]').disabled = !row.previousElementSibling;
+  sheet.querySelector('[data-sh="next"]').disabled = !row.nextElementSibling;
+  sheet.classList.add('open'); $('#scrim').classList.add('open');
+}
+function closeSheet() { $('#sheet').classList.remove('open'); $('#scrim').classList.remove('open'); sheetRow = null; }
+document.addEventListener('click', e => {
+  if (!isPhone() || e.target.closest('a, .sheet, .tierbtns, .ctl, .play')) return;
+  const row = e.target.closest('.list .row'); if (row && row.querySelector('.tierbtns')) openSheet(row);
+});
+$('#scrim').onclick = closeSheet;
+$('#sheet').addEventListener('click', e => {
+  if (!sheetRow) return;
+  const row = sheetRow;
+  const t = e.target.closest('.sh-tiers button');
+  if (t) {
+    row.querySelector(`.tierbtns button[data-tier="${t.dataset.tier}"]`).click();
+    const next = row.nextElementSibling;
+    setTimeout(() => next ? (openSheet(next), next.scrollIntoView({ block: 'center', behavior: 'smooth' })) : closeSheet(), 220);
+    t.parentNode.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === t && !x.classList.contains('on')));
+    return;
+  }
+  const a = e.target.closest('[data-sh]')?.dataset.sh;
+  if (a === 'close') closeSheet();
+  if (a === 'play') row.querySelector('.play')?.click();
+  if (a === 'prev' && row.previousElementSibling) openSheet(row.previousElementSibling);
+  if (a === 'next' && row.nextElementSibling) openSheet(row.nextElementSibling);
+  if (['up', 'down', 'top'].includes(a)) { row.querySelector(`[data-move="${a}"]`).click(); openSheet(row); row.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+});
+
 function copyText(t) {
   navigator.clipboard?.writeText(t).then(() => alert('Copied to clipboard!'), () => prompt('Copy:', t));
 }
@@ -481,6 +528,7 @@ async function route() {
     else if (kind === 'album') await albumPage(a, b);
     else home();
   } catch (e) { console.error(e); view.innerHTML = `<p class="muted">Couldn't reach the music catalog. Try again in a moment.</p>`; }
+  closeSheet();
   window.scrollTo(0, 0);
 }
 $('#searchForm').onsubmit = e => { e.preventDefault(); location.hash = `#/search/${encodeURIComponent($('#q').value.trim())}`; };
