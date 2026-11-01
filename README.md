@@ -3,9 +3,9 @@
 Listen through an artist's **entire discography** and rank every album and every song. A clean static site with no build step and no API keys.
 
 - Search any artist and see every release with artwork, in release order
-- Play 30-second previews, with auto-advance and "play all"
+- Listen wherever you like (Spotify, Apple Music and YouTube Music links on every album) and tap S–F on each song as it plays
 - Rank albums and songs by dragging them or using the arrow buttons. Rank tracks within each album too
-- 1–5 star ratings, listened checkboxes and progress through the discography
+- Drag-or-tap tier list boards for albums and songs, with "Order by tier" to seed rankings
 - Copy a ranking as text to share it
 - Everything is saved in your browser (localStorage)
 

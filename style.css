@@ -55,4 +55,36 @@ h2{margin:32px 0 12px;font-size:20px}
 .foot{text-align:center;color:var(--muted);font-size:12px;padding:30px 16px}
 .empty{text-align:center;padding:60px 0}
 .empty h1{font-size:clamp(32px,6vw,56px)}
-@media(max-width:600px){.row .stars{display:none}.hero img{width:140px}}
+@media(max-width:600px){.hero img{width:140px}}
+/* tiers */
+.t-S{--tc:#ff7f7f}.t-A{--tc:#ffbf7f}.t-B{--tc:#ffdf7f}.t-C{--tc:#bfff7f}.t-D{--tc:#7fbfff}.t-F{--tc:#c79bff}
+.tierbtns{display:flex;gap:3px}
+.tierbtns button{width:30px;height:30px;padding:0;font-weight:800;font-size:13px;background:var(--line);color:var(--muted)}
+.tierbtns button:hover{color:var(--tc)}
+.tierbtns button.on{background:var(--tc);color:#111}
+.badge[class*="t-"]{background:var(--tc)}
+.board{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tier{display:flex;border-bottom:1px solid var(--line);min-height:84px;cursor:pointer}
+.tier:last-child{border-bottom:0}
+.tlabel{width:64px;flex:none;display:grid;place-items:center;font-weight:800;font-size:26px;background:var(--tc);color:#111}
+.tzone{flex:1;display:flex;flex-wrap:wrap;gap:6px;padding:6px;align-content:flex-start;background:var(--card)}
+.tzone.over{outline:2px dashed var(--accent);outline-offset:-4px}
+.pool{border-radius:12px;min-height:90px;cursor:pointer}
+.pgroup{width:100%;color:var(--muted);font-size:12px;font-weight:600;margin:8px 2px 0;text-transform:uppercase;letter-spacing:.5px}
+.chip{position:relative;cursor:grab;border-radius:6px;overflow:hidden;background:var(--line);touch-action:manipulation}
+.chip.albums{width:72px;height:72px}
+.chip.albums img{width:100%;height:100%;object-fit:cover;display:block}
+.chip.albums .cap{position:absolute;inset:auto 0 0;background:#000b;font-size:9px;padding:2px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0}
+.chip.albums:hover .cap{opacity:1}
+.chip.songs{display:flex;align-items:center;gap:6px;padding-right:10px;max-width:220px;height:36px;font-size:12px}
+.chip.songs img{width:36px;height:36px;object-fit:cover}
+.chip.songs span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.sel{outline:3px solid var(--accent);outline-offset:-3px}
+.hint{align-self:center;font-size:13px}
+.links{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0;font-size:14px}
+.links a{background:var(--line);padding:6px 12px;border-radius:999px}
+.links a:hover{background:var(--accent)}
+.albtier{display:flex;gap:10px;align-items:center;margin-top:8px}
+.nav{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px}
+.nav span{display:flex;gap:16px}
+@media(max-width:600px){.row .ctl,.row .handle{display:none}.tierbtns button{width:26px;height:28px}.tlabel{width:44px;font-size:20px}.chip.albums{width:58px;height:58px}}
