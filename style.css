@@ -213,3 +213,24 @@ main{position:relative;padding:24px clamp(16px,4vw,40px);max-width:1100px;margin
   .verdict .tierbtns{display:grid;grid-template-columns:repeat(6,1fr)}
   .verdict .tierbtns button{width:auto}
 }
+/* simplified rating model */
+.toggles{display:flex;flex-direction:column;gap:2px;margin-top:10px}
+.verdict{display:block}
+.vbig{display:flex;align-items:center;gap:12px;margin:6px 0 14px}
+.badge2.big{font-size:28px;padding:6px 16px;border-radius:10px}
+.verdict .tierbtns{margin-top:8px}
+.nextbar{margin:8px 0 24px}
+.nextbar .btn{display:block;text-align:center}
+.tierhead{display:flex;align-items:center;gap:10px;margin:22px 0 8px}
+.small-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.rlist li a{display:block}
+.rlist li a .s{font-weight:400;font-size:12px}
+.row .rk:empty{display:none}
+.sheet{visibility:hidden;transition:transform .25s ease,visibility 0s .25s}
+.sheet.open{visibility:visible;transition:transform .25s ease}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);cursor:pointer;margin:4px 0}
+.switch input{position:absolute;opacity:0;pointer-events:none}
+.switch span{width:36px;height:20px;border-radius:10px;background:var(--line);position:relative;transition:.2s;flex:none}
+.switch span::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text);transition:.2s}
+.switch input:checked+span{background:var(--accent)}
+.switch input:checked+span::after{left:18px}
