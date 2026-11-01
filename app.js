@@ -58,7 +58,50 @@ async function getDiscography(artistId) {
       if (seen.has(k)) return false; seen.add(k); return true;
     })
     .sort((a, b) => a.releaseDate.localeCompare(b.releaseDate));
-  return (cache[artistId] = { artist, albums });
+  albums.forEach(a => a.kind = kindOf(a));
+  // Reissues ("OK Computer OKNOTOK", "KID A MNESIA") start with an earlier album's title.
+  const norm = t => t.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+  albums.forEach((a, i) => {
+    if (a.kind !== 'album') return;
+    const n = norm(a.collectionName);
+    if (albums.slice(0, i).some(b => b.kind === 'album' && n !== norm(b.collectionName) && n.startsWith(norm(b.collectionName) + ' '))) a.kind = 'other';
+  });
+  const main = albums.filter(a => a.kind === 'album');
+  return (cache[artistId] = { artist, albums, main: main.length ? main : albums });
+}
+// iTunes has no album-type field, so classify by name + size.
+function kindOf(a) {
+  const n = a.collectionName;
+  if (/\b(live|unplugged)\b|in concert|greatest hits|best of|the essential|anthology|collection|remix|\bRMX\b|\bdis[ck] \d|instrumentals?\b|karaoke|tribute|b-sides|rarities/i.test(n)) return 'other';
+  if (/ - single$/i.test(n) || a.trackCount <= 3) return 'single';
+  if (/ - ep$|\bEP\b/i.test(n) || a.trackCount <= 6) return 'ep';
+  return 'album';
+}
+const KINDS = [['album', 'Albums'], ['ep', 'EPs'], ['single', 'Singles'], ['other', 'Live & other']];
+const SCORE = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
+const scoreTier = s => s == null ? null : TIERS[Math.min(5, Math.max(0, Math.round(6 - s)))];
+// Album score: your album tier if set, else the average of its song tiers.
+function albumScore(st, a, tracks) {
+  const t = tierOf(st, 'albums', a.collectionId);
+  const songs = (tracks || []).map(x => tierOf(st, 'songs', x.trackId)).filter(Boolean).map(x => SCORE[x]);
+  const avg = songs.length ? songs.reduce((p, q) => p + q, 0) / songs.length : null;
+  return { tier: t, avg, rated: songs.length, total: (tracks || []).length || a.trackCount, value: t ? SCORE[t] : avg };
+}
+function reviewed(st, a) {
+  return !!tierOf(st, 'albums', a.collectionId);
+}
+// Keep one snapshot per day of the album ranking so you can see how it shifts.
+function snapshot(st, main) {
+  const ranked = ordered(main.filter(a => tierOf(st, 'albums', a.collectionId)), st.albumOrder, a => a.collectionId)
+    .sort((a, b) => TIERS.indexOf(tierOf(st, 'albums', a.collectionId)) - TIERS.indexOf(tierOf(st, 'albums', b.collectionId)))
+    .map(a => String(a.collectionId));
+  st.history ||= [];
+  const day = new Date().toISOString().slice(0, 10);
+  const last = st.history.at(-1);
+  if (last?.day === day) last.order = ranked;
+  else if (!last || last.order.join() !== ranked.join()) st.history.push({ day, order: ranked });
+  save();
+  return ranked;
 }
 async function getTracks(collectionId) {
   const key = 'c' + collectionId;
@@ -210,51 +253,89 @@ async function search(q) {
     <div class="t">${esc(a.artistName)}</div><div class="s">${esc(a.primaryGenreName || '')}</div></a>`).join('')}</div>`;
 }
 
-const TABS = [['albums', 'Discography'], ['albumtiers', 'Album tier list'], ['songtiers', 'Song tier list'], ['rank', 'Album ranking'], ['songs', 'Song ranking']];
+const TABS = [['albums', 'Discography'], ['time', 'Over time'], ['albumtiers', 'Album tiers'], ['songtiers', 'Song tiers'], ['rank', 'Album ranking'], ['songs', 'Song ranking']];
 
-async function artistPage(id, tab = 'albums') {
+async function artistPage(id, tab = 'albums', sub) {
   view.innerHTML = `<p class="muted">Loading discography…</p>`;
-  const { artist, albums } = await getDiscography(id);
+  const { artist, albums, main } = await getDiscography(id);
   if (!artist) { view.innerHTML = `<p class="muted">Artist not found.</p>`; return; }
   const st = artistState(id);
-  st.name = artist.artistName; st.art = art(albums.at(-1)?.artworkUrl100, 300); save();
-  const totalTracks = albums.reduce((s, a) => s + a.trackCount, 0);
-  const rated = TIERS.reduce((s, t) => s + st.tiers.songs[t].length, 0);
-  const pct = totalTracks ? Math.min(100, Math.round((rated / totalTracks) * 100)) : 0;
+  const latest = main.at(-1);
+  st.name = artist.artistName; st.art = art(latest?.artworkUrl100, 300); save();
+  const done = main.filter(a => reviewed(st, a)).length;
+  const pct = main.length ? Math.round((done / main.length) * 100) : 0;
+  const nextUp = main.find(a => !reviewed(st, a));
 
   view.innerHTML = `
-    <div class="hero"><img src="${esc(art(albums.at(-1)?.artworkUrl100, 400))}" alt="">
+    <div class="hero"><a href="#/album/${id}/${latest.collectionId}"><img src="${esc(art(latest.artworkUrl100, 400))}" alt=""></a>
       <div><div class="muted">Artist</div><h1>${esc(artist.artistName)}</h1>
-      <div class="muted">${albums.length} releases · ${totalTracks} tracks · ${esc(artist.primaryGenreName || '')}</div>
-      <div class="prog"><div style="width:${pct}%"></div></div><div class="muted">${rated} songs rated (${pct}%)</div></div></div>
+      <div class="muted">Latest: <a href="#/album/${id}/${latest.collectionId}"><b>${esc(latest.collectionName)}</b></a> (${year(latest.releaseDate)})</div>
+      <div class="prog"><div style="width:${pct}%"></div></div>
+      <div class="muted">${done} / ${main.length} albums reviewed</div>
+      <div class="tools">${nextUp
+        ? `<a class="btn primary" href="#/album/${id}/${nextUp.collectionId}">${done ? 'Continue' : 'Start'} reviewing: ${esc(nextUp.collectionName)} →</a>`
+        : `<a class="btn primary" href="#/artist/${id}/time">All albums reviewed. See your verdict →</a>`}</div></div></div>
     <div class="tabs">${TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="tab"></div>`;
   view.querySelector('.tabs').onclick = e => { const t = e.target.dataset.tab; if (t) location.hash = `#/artist/${id}/${t}`; };
   const el = $('#tab');
 
   if (tab === 'albums') {
-    el.innerHTML = `<p class="muted">Open an album, put it on wherever you listen, and tap a tier for each song as it plays.</p><div class="grid">${albums.map(a => {
-      const t = tierOf(st, 'albums', a.collectionId);
-      return `<a class="card" href="#/album/${id}/${a.collectionId}">${t ? `<span class="badge t-${t}">${t}</span>` : ''}
-        <img loading="lazy" src="${esc(art(a.artworkUrl100, 400))}" alt=""><div class="t">${esc(a.collectionName)}</div>
-        <div class="s">${year(a.releaseDate)} · ${a.trackCount} tracks</div></a>`;
-    }).join('')}</div>`;
+    const kind = sub || 'album';
+    const list = albums.filter(a => a.kind === kind).reverse(); // newest first
+    const counts = Object.fromEntries(KINDS.map(([k]) => [k, albums.filter(a => a.kind === k).length]));
+    el.innerHTML = `<div class="chips">${KINDS.filter(([k]) => counts[k]).map(([k, l]) =>
+        `<a class="chipf ${k === kind ? 'on' : ''}" href="#/artist/${id}/albums/${k}">${l} <span>${counts[k]}</span></a>`).join('')}</div>
+      <div class="grid">${list.map(a => {
+        const t = tierOf(st, 'albums', a.collectionId);
+        return `<a class="card" href="#/album/${id}/${a.collectionId}">${t ? `<span class="badge t-${t}">${t}</span>` : ''}
+          <img loading="lazy" src="${esc(art(a.artworkUrl100, 400))}" alt=""><div class="t">${esc(a.collectionName.replace(/ - (Single|EP)$/i, ''))}</div>
+          <div class="s">${year(a.releaseDate)} · ${a.trackCount} tracks</div></a>`;
+      }).join('') || '<p class="muted">Nothing here.</p>'}</div>`;
   }
 
-  if (tab === 'albumtiers') tierBoard(el, st, 'albums', albums, {
-    id: a => a.collectionId, title: a => a.collectionName, img: a => a.artworkUrl100, heading: `${artist.artistName} — album tier list`,
-  });
+  if (tab === 'time') {
+    el.innerHTML = `<p class="muted">Loading…</p>`;
+    const trackLists = await Promise.all(main.map(a => getTracks(a.collectionId).catch(() => [])));
+    const pts = main.map((a, i) => ({ a, ...albumScore(st, a, trackLists[i]) }));
+    const ranked = snapshot(st, main);
+    const prev = st.history.length > 1 ? st.history.at(-2) : null;
+    const byId = new Map(main.map(a => [String(a.collectionId), a]));
+    el.innerHTML = `
+      <h2>Career arc</h2>
+      <p class="muted">Each album in release order, scored by your album tier (or the average of its song tiers until you pick one).</p>
+      ${arcChart(pts, id)}
+      <h2>Your ranking</h2>
+      ${ranked.length ? `<ol class="rlist">${ranked.map((cid, i) => {
+        const a = byId.get(cid), t = tierOf(st, 'albums', cid);
+        const was = prev ? prev.order.indexOf(cid) : -1;
+        const mv = !prev ? '' : was < 0 ? '<span class="mv new">new</span>' : was > i ? `<span class="mv up">▲${was - i}</span>` : was < i ? `<span class="mv down">▼${i - was}</span>` : '<span class="mv">–</span>';
+        return `<li><span class="rk">${i + 1}</span><img src="${esc(art(a.artworkUrl100, 100))}" alt=""><a href="#/album/${id}/${cid}">${esc(a.collectionName)}</a>
+          <span class="muted">${year(a.releaseDate)}</span><span class="badge2 t-${t}">${t}</span>${mv}</li>`;
+      }).join('')}</ol>${prev ? `<p class="muted">Arrows compare with your ranking on ${prev.day}.</p>` : ''}`
+      : '<p class="muted">Give albums a tier to start your ranking.</p>'}
+      ${st.history.length > 1 ? `<h2>How your ranking changed</h2><div class="hist">${[...st.history].reverse().map(h => `
+        <div class="hrow"><span class="muted">${h.day}</span><div class="hcovers">${h.order.slice(0, 10).map((cid, i) => byId.get(cid) ? `<img title="${i + 1}. ${esc(byId.get(cid).collectionName)}" src="${esc(art(byId.get(cid).artworkUrl100, 100))}" alt="">` : '').join('')}</div></div>`).join('')}</div>` : ''}`;
+    wireArc(el);
+  }
+
+  if (tab === 'albumtiers') {
+    const pool = albums.filter(a => a.kind === 'album' || tierOf(st, 'albums', a.collectionId));
+    tierBoard(el, st, 'albums', pool, {
+      id: a => a.collectionId, title: a => a.collectionName, img: a => a.artworkUrl100, heading: `${artist.artistName}: album tier list`,
+    });
+  }
 
   if (tab === 'songtiers') {
     el.innerHTML = `<p class="muted">Loading all songs…</p>`;
-    const songs = await getAllSongs(albums);
+    const songs = await getAllSongs([...main].reverse());
     tierBoard(el, st, 'songs', songs, {
-      id: t => t.trackId, title: t => t.trackName, img: t => t.artworkUrl100, group: t => t.collectionName, heading: `${artist.artistName} — song tier list`,
+      id: t => t.trackId, title: t => t.trackName, img: t => t.artworkUrl100, group: t => t.collectionName, heading: `${artist.artistName}: song tier list`,
     });
   }
 
   if (tab === 'rank') {
     const tierRank = a => { const t = tierOf(st, 'albums', a.collectionId); return t ? TIERS.indexOf(t) : 9; };
-    const list = ordered(albums, st.albumOrder, a => a.collectionId);
+    const list = ordered(main, st.albumOrder, a => a.collectionId);
     el.innerHTML = `<div class="tools"><button id="share">Copy ranking as text</button><button id="bytier">Order by tier</button><button id="reset">Reset</button></div>
       <p class="muted">Drag rows (or use the arrows). #1 is your favorite.</p>
       <ul class="list">${list.map((a, i) => `<li class="row" draggable="true" data-id="${a.collectionId}">
@@ -262,21 +343,21 @@ async function artistPage(id, tab = 'albums') {
         <div class="info"><div><a href="#/album/${id}/${a.collectionId}">${esc(a.collectionName)}</a></div><div class="s">${year(a.releaseDate)}</div></div>
         ${tierBtns(st, 'albums', a.collectionId)}${ctl}</li>`).join('')}</ul>`;
     if (!st.albumOrder.length) { st.albumOrder = list.map(a => String(a.collectionId)); save(); }
-    sortable($('.list', el), o => { st.albumOrder = o; save(); });
-    wireTierBtns(el, st);
-    $('#bytier').onclick = () => { st.albumOrder = ordered(albums, st.albumOrder, a => a.collectionId).sort((a, b) => tierRank(a) - tierRank(b)).map(a => String(a.collectionId)); save(); artistPage(id, 'rank'); };
+    sortable($('.list', el), o => { st.albumOrder = o; save(); snapshot(st, main); });
+    wireTierBtns(el, st, () => snapshot(st, main));
+    $('#bytier').onclick = () => { st.albumOrder = ordered(main, st.albumOrder, a => a.collectionId).sort((a, b) => tierRank(a) - tierRank(b)).map(a => String(a.collectionId)); save(); snapshot(st, main); artistPage(id, 'rank'); };
     $('#reset').onclick = () => { if (confirm('Reset album ranking?')) { st.albumOrder = []; save(); artistPage(id, 'rank'); } };
     $('#share').onclick = () => copyText(`My ${artist.artistName} album ranking\n` +
-      st.albumOrder.map((cid, i) => `${i + 1}. ${albums.find(a => String(a.collectionId) === cid)?.collectionName}`).join('\n'));
+      st.albumOrder.map((cid, i) => `${i + 1}. ${main.find(a => String(a.collectionId) === cid)?.collectionName}`).join('\n'));
   }
 
   if (tab === 'songs') {
     el.innerHTML = `<p class="muted">Loading all songs…</p>`;
-    const songs = await getAllSongs(albums);
+    const songs = await getAllSongs(main);
     const tierRank = t => { const x = tierOf(st, 'songs', t.trackId); return x ? TIERS.indexOf(x) : 9; };
     const list = ordered(songs, st.songOrder, t => t.trackId);
     el.innerHTML = `<div class="tools"><button id="share">Copy top 25 as text</button><button id="bytier">Order by tier</button><button id="reset">Reset</button></div>
-      <p class="muted">${songs.length} songs. Tip: tier them first, hit “Order by tier”, then fine-tune by dragging.</p>
+      <p class="muted">${songs.length} songs from the main albums. Tip: tier them first, hit “Order by tier”, then fine-tune by dragging.</p>
       <ul class="list">${list.map((t, i) => songRow(t, i, st, true)).join('')}</ul>`;
     if (!st.songOrder.length) { st.songOrder = list.map(t => String(t.trackId)); save(); }
     const ul = $('.list', el);
@@ -287,6 +368,39 @@ async function artistPage(id, tab = 'albums') {
     $('#share').onclick = () => copyText(`My top ${artist.artistName} songs\n` +
       st.songOrder.slice(0, 25).map((tid, i) => `${i + 1}. ${songs.find(t => String(t.trackId) === tid)?.trackName}`).join('\n'));
   }
+}
+
+// Career arc: one series, albums in release order on x, score (F..S) on y.
+function arcChart(pts, artistId) {
+  const W = Math.max(340, Math.min(760, view.clientWidth - 16)), H = W < 500 ? 240 : 280, L = 34, R = 16, T = 16, B = 34;
+  const n = pts.length, x = i => L + (n === 1 ? (W - L - R) / 2 : i * (W - L - R) / (n - 1));
+  const y = v => T + (6 - v) * (H - T - B) / 5;
+  const scored = pts.map((p, i) => ({ ...p, i })).filter(p => p.value != null);
+  const path = scored.map((p, k) => `${k ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.value).toFixed(1)}`).join('');
+  const every = Math.ceil(n / 10);
+  return `<div class="arc"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Album scores over the artist's career">
+    ${TIERS.map((t, k) => `<line x1="${L}" x2="${W - R}" y1="${y(6 - k)}" y2="${y(6 - k)}" class="grid"/><text x="${L - 10}" y="${y(6 - k) + 4}" class="ylab">${t}</text>`).join('')}
+    ${pts.map((p, i) => i % every === 0 || i === n - 1 ? `<text x="${x(i)}" y="${H - 10}" class="xlab">${year(p.a.releaseDate)}</text>` : '').join('')}
+    <path d="${path}" class="line"/>
+    ${pts.map((p, i) => p.value == null
+      ? `<circle cx="${x(i)}" cy="${H - B}" r="4" class="todo" data-i="${i}"/>`
+      : `<circle cx="${x(i)}" cy="${y(p.value)}" r="6" class="dot t-${p.tier || scoreTier(p.value)}" data-i="${i}"/>`).join('')}
+    ${pts.map((p, i) => `<rect x="${x(i) - 14}" y="${T}" width="28" height="${H - T - 4}" class="hit" data-i="${i}" data-href="#/album/${artistId}/${p.a.collectionId}"
+      data-tip="${esc(`<b>${p.a.collectionName}</b><br>${year(p.a.releaseDate)} · ${p.tier ? `Album tier ${p.tier}` : p.value != null ? `Song avg ≈ ${scoreTier(p.value)}` : 'Not reviewed yet'}${p.rated ? `<br>${p.rated}/${p.total} songs rated` : ''}`)}"/>`).join('')}
+  </svg><div class="tip hidden"></div></div>
+  <p class="muted small">Hollow dots on the baseline are albums you haven't reviewed yet. Tap a dot to open the album.</p>`;
+}
+function wireArc(el) {
+  const box = $('.arc', el); if (!box) return;
+  const tip = $('.tip', box);
+  box.addEventListener('pointermove', e => {
+    const h = e.target.closest('.hit'); if (!h) { tip.classList.add('hidden'); return; }
+    tip.innerHTML = h.dataset.tip; tip.classList.remove('hidden');
+    const r = box.getBoundingClientRect(), hr = h.getBoundingClientRect();
+    tip.style.left = Math.min(r.width - 180, Math.max(0, hr.left - r.left - 80)) + 'px'; tip.style.top = '0px';
+  });
+  box.addEventListener('pointerleave', () => tip.classList.add('hidden'));
+  box.addEventListener('click', e => { const h = e.target.closest('.hit'); if (h) location.hash = h.dataset.href; });
 }
 
 function songRow(t, i, st, showAlbum) {
@@ -304,30 +418,39 @@ function wireSongRows(ul, tracks, st, after) {
 
 async function albumPage(artistId, cid) {
   view.innerHTML = `<p class="muted">Loading album…</p>`;
-  const [{ albums }, tracks] = await Promise.all([getDiscography(artistId), getTracks(cid)]);
+  const [{ albums, main }, tracks] = await Promise.all([getDiscography(artistId), getTracks(cid)]);
   const album = albums.find(a => String(a.collectionId) === String(cid)) || tracks[0];
   const st = artistState(artistId);
   const ok = 'o' + cid;
   st[ok] ||= [];
   const list = ordered(tracks, st[ok], t => t.trackId);
   const total = tracks.reduce((s, t) => s + (t.trackTimeMillis || 0), 0);
-  const i = albums.indexOf(album), prev = albums[i - 1], next = albums[i + 1];
-  const counter = () => `${tracks.filter(t => tierOf(st, 'songs', t.trackId)).length} / ${tracks.length} rated`;
+  const seq = album.kind === 'album' ? main : albums.filter(a => a.kind === album.kind); // step through same kind, oldest → newest
+  const i = seq.indexOf(album), prev = seq[i - 1], next = seq[i + 1];
+  const pos = i >= 0 ? `${album.kind === 'album' ? 'Album' : 'Release'} ${i + 1} of ${seq.length}` : '';
+  const verdict = () => {
+    const sc = albumScore(st, album, tracks);
+    return `${sc.rated} / ${tracks.length} songs rated${sc.avg != null ? ` · song average ≈ <b>${scoreTier(sc.avg)}</b>` : ''}`;
+  };
   view.innerHTML = `<div class="nav"><a class="muted" href="#/artist/${artistId}">← ${esc(album.artistName)}</a>
-      <span>${prev ? `<a class="muted" href="#/album/${artistId}/${prev.collectionId}">‹ Prev album</a>` : ''}
-      ${next ? `<a class="muted" href="#/album/${artistId}/${next.collectionId}">Next album ›</a>` : ''}</span></div>
+      <span>${prev ? `<a class="muted" href="#/album/${artistId}/${prev.collectionId}">‹ Prev</a>` : ''}
+      <span class="muted">${pos}</span>
+      ${next ? `<a class="muted" href="#/album/${artistId}/${next.collectionId}">Next ›</a>` : ''}</span></div>
     <div class="hero"><img src="${esc(art(album.artworkUrl100, 600))}" alt="">
       <div><div class="muted">${year(album.releaseDate)} · ${tracks.length} songs · ${Math.round(total / 60000)} min</div>
       <h1>${esc(album.collectionName)}</h1>
-      ${listenLinks(album.artistName, album.collectionName, album.collectionViewUrl)}
-      <div class="albtier"><span class="muted">Album tier</span>${tierBtns(st, 'albums', cid)}</div></div></div>
-    <h2>Tap a tier as each song plays <span class="muted" id="cnt">${counter()}</span></h2>
+      ${listenLinks(album.artistName, album.collectionName, album.collectionViewUrl)}</div></div>
+    <h2>Tap a tier as each song plays</h2>
     <ul class="list">${list.map((t, i) => songRow(t, i, st, false)).join('')}</ul>
-    <p class="muted">Drag or use the arrows to put this album's tracks in order.</p>`;
+    <div class="verdict"><div><div class="muted" id="cnt">${verdict()}</div>
+      <h2>Your verdict on the album</h2>${tierBtns(st, 'albums', cid)}</div>
+      ${next ? `<a class="btn primary" href="#/album/${artistId}/${next.collectionId}">Next album: ${esc(next.collectionName)} (${year(next.releaseDate)}) →</a>`
+        : `<a class="btn primary" href="#/artist/${artistId}/time">That's the latest release. See how it all ranks →</a>`}</div>
+    <p class="muted small">Drag or use the arrows to put this album's tracks in order.</p>`;
   const ul = $('.list');
   sortable(ul, o => { st[ok] = o; save(); });
-  wireSongRows(ul, tracks, st, () => { $('#cnt').textContent = counter(); });
-  wireTierBtns($('.hero'), st);
+  wireSongRows(ul, tracks, st, () => { $('#cnt').innerHTML = verdict(); });
+  wireTierBtns($('.verdict'), st, () => { $('#cnt').innerHTML = verdict(); snapshot(st, main); });
 }
 
 function copyText(t) {
@@ -336,10 +459,10 @@ function copyText(t) {
 
 // ---------- router ----------
 async function route() {
-  const [, kind, a, b] = location.hash.split('/');
+  const [, kind, a, b, c] = location.hash.split('/');
   try {
     if (kind === 'search') { $('#q').value = decodeURIComponent(a); await search(decodeURIComponent(a)); }
-    else if (kind === 'artist') await artistPage(a, b || 'albums');
+    else if (kind === 'artist') await artistPage(a, b || 'albums', c);
     else if (kind === 'album') await albumPage(a, b);
     else home();
   } catch (e) { console.error(e); view.innerHTML = `<p class="muted">Couldn't reach the music catalog. Try again in a moment.</p>`; }
