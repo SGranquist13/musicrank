@@ -149,7 +149,7 @@ const listenLinks = (artistName, title, appleUrl) => {
 // ?theme=paper|night|art previews a theme (and remembers it).
 const qTheme = new URLSearchParams(location.search).get('theme');
 if (qTheme) { prefs.theme = qTheme; save(); }
-document.documentElement.dataset.theme = prefs.theme || 'art';
+document.documentElement.dataset.theme = prefs.theme || 'swiss';
 const DEFAULT_ACCENT = getComputedStyle(document.documentElement).getPropertyValue('--accent');
 // Pick the most vibrant color from a tiny copy of the cover and make it readable on the dark base.
 const tintCache = {};
@@ -424,29 +424,39 @@ async function albumPage(artistId, cid) {
   const ak = albumKey(album);
 
   tint(album.artworkUrl100);
-  view.innerHTML = `${backdrop(album.artworkUrl100)}<div class="nav"><a class="muted" href="#/artist/${artistId}">← ${esc(album.artistName)}</a>
-      <span>${prev ? `<a class="muted" href="#/album/${artistId}/${prev.collectionId}">‹ Prev</a>` : ''}
-      <span class="muted">${pos}</span>
-      ${next ? `<a class="muted" href="#/album/${artistId}/${next.collectionId}">Next ›</a>` : ''}</span></div>
-    <div class="hero"><img src="${esc(art(album.artworkUrl100, 600))}" alt="">
-      <div><div class="eyebrow">${year(album.firstDate)} · ${tracks.length} songs · ${Math.round(total / 60000)} min</div>
-      <h1>${esc(album.collectionName)}</h1>
-      ${new Set(editions.map(e => e.trackCount)).size > 1 ? `<div class="chips">${[...new Map(editions.map(e => [e.trackCount, e])).values()].map((e, n) => `<a class="chipf ${e.trackCount === album.trackCount ? 'on' : ''}" href="#/album/${artistId}/${e.collectionId}">${edLabel(e, n)} songs</a>`).join('')}</div>` : ''}
-      ${listenLinks(album.artistName, album.collectionName, album.collectionViewUrl)}</div></div>
-    <h2>Rate each song as it plays</h2>
-    <ul class="list">${tracks.map((t, n) => songRow(t, st, n + 1)).join('')}</ul>
-    <div class="verdict" id="verdict"></div>
-    <div class="nextbar">${next ? `<a class="btn primary" href="#/album/${artistId}/${next.collectionId}">Next album: ${esc(next.collectionName)} (${year(next.firstDate)}) →</a>`
-      : `<a class="btn primary" href="#/artist/${artistId}/rank">That's the latest. See your ranking →</a>`}</div>`;
+  const editionChips = new Set(editions.map(e => e.trackCount)).size > 1
+    ? `<div class="chips">${[...new Map(editions.map(e => [e.trackCount, e])).values()].map((e, n) => `<a class="chipf ${e.trackCount === album.trackCount ? 'on' : ''}" href="#/album/${artistId}/${e.collectionId}">${edLabel(e, n)}</a>`).join('')}</div>` : '';
+  view.innerHTML = `${backdrop(album.artworkUrl100)}
+    <div class="nav"><a href="#/artist/${artistId}">← ${esc(album.artistName)}</a>
+      <span>${prev ? `<a href="#/album/${artistId}/${prev.collectionId}">‹ Prev</a>` : ''}${next ? `<a href="#/album/${artistId}/${next.collectionId}">Next ›</a>` : ''}</span></div>
+    <section class="bento album-bento">
+      <div class="tile b-cover"><img src="${esc(art(album.artworkUrl100, 600))}" alt=""></div>
+      <div class="tile b-title">
+        <div class="eyebrow">${pos}</div>
+        <h1>${esc(album.collectionName)}</h1>
+        <dl class="facts"><div><dt>Year</dt><dd>${year(album.firstDate)}</dd></div><div><dt>Songs</dt><dd>${tracks.length}</dd></div><div><dt>Length</dt><dd>${Math.round(total / 60000)}m</dd></div></dl>
+        ${editionChips}
+      </div>
+      <div class="tile b-score" id="verdict"></div>
+      <div class="tile b-progress" id="progress"></div>
+      <div class="tile b-listen"><div class="eyebrow">Listen on</div>${listenLinks(album.artistName, album.collectionName, album.collectionViewUrl).replace('<span class="muted">Listen on</span>', '')}</div>
+      <div class="tile b-tracks"><div class="tile-head"><h2>Tracks</h2><span class="eyebrow">Tap to rate</span></div>
+        <ul class="list">${tracks.map((t, n) => songRow(t, st, String(n + 1).padStart(2, '0'))).join('')}</ul></div>
+      ${next ? `<a class="tile b-next" href="#/album/${artistId}/${next.collectionId}"><span class="eyebrow">Next album</span><b>${esc(next.collectionName)}</b><span class="arrow">→</span></a>`
+        : `<a class="tile b-next" href="#/artist/${artistId}/rank"><span class="eyebrow">That's the latest</span><b>See your ranking</b><span class="arrow">→</span></a>`}
+    </section>`;
 
   const renderVerdict = () => {
     const r = albumRating(st, album, tracks);
     $('#verdict').innerHTML = `
-      <div class="vrow"><div><div class="eyebrow">Album rating</div>
-        <div class="vbig">${r.final ? `<span class="badge2 big t-${r.final}">${r.final}</span>` : '<span class="muted">–</span>'}
-        <span class="muted">${r.mine ? `Your call · songs average ${r.auto || '–'}` : r.auto ? `Auto · average of ${r.rated}/${r.total} songs` : 'Rate songs to get an automatic album rating'}</span></div></div></div>
-      <div class="muted small">${r.mine ? 'Tap your pick again to go back to the automatic rating.' : 'Disagree? Pick the album rating yourself:'}</div>
+      <div class="eyebrow">${r.mine ? 'Your call' : 'Album rating · auto'}</div>
+      <div class="score ${r.final ? 't-' + r.final : ''}">${r.final || '–'}</div>
+      <div class="small muted">${r.mine ? `Songs average ${r.auto || '–'}. Tap your pick again to undo.` : r.auto ? `Average of ${r.rated} rated songs. Disagree? Pick one:` : 'Rate songs to get a rating.'}</div>
       ${tierBtns(st, 'albums', ak)}`;
+    const pct = r.total ? Math.round(r.rated / r.total * 100) : 0;
+    $('#progress').innerHTML = `<div class="eyebrow">Rated</div>
+      <div class="num">${r.rated}<span>/${r.total}</span></div>
+      <div class="bar"><div style="width:${pct}%"></div></div>`;
   };
   renderVerdict();
   wireSongRows($('.list'), tracks, st, renderVerdict);
