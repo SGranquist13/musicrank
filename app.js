@@ -376,7 +376,7 @@ async function albumPage(artistId, cid) {
   const i = seq.findIndex(a => a.groupKey === album.groupKey), prev = seq[i - 1], next = seq[i + 1];
   const pos = i >= 0 ? `${seq === main && !st.withSingles ? 'Album' : 'Release'} ${i + 1} of ${seq.length}` : '';
   const editions = [...album.eds].sort((a, b) => a.trackCount - b.trackCount);
-  const edLabel = (e, n) => n === 0 ? `Standard · ${e.trackCount}` : `${/deluxe|bonus|expanded|anniversary/i.test(e.collectionName) ? 'Deluxe' : 'Edition'} · ${e.trackCount}`;
+  const edLabel = (e, n) => n === 0 ? `Standard · ${e.trackCount}` : `Deluxe · ${e.trackCount}`;
   const ak = albumKey(album);
 
   view.innerHTML = `<div class="nav"><a class="muted" href="#/artist/${artistId}">← ${esc(album.artistName)}</a>
