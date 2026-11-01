@@ -54,7 +54,7 @@ async function getDiscography(artistId) {
   const albums = d.results
     .filter(r => r.wrapperType === 'collection' && String(r.artistId) === String(artistId))
     .filter(r => {
-      const k = r.collectionName.toLowerCase().replace(/\s*[\(\[].*?(edition|version|remaster|deluxe|explicit|clean).*?[\)\]]/g, '').trim() + (r.trackCount > 3 ? '' : r.collectionId);
+      const k = r.collectionName.toLowerCase().replace(/\s*[\(\[].*?(edition|version|remaster|deluxe|explicit|clean).*?[\)\]]/g, '').trim();
       if (seen.has(k)) return false; seen.add(k); return true;
     })
     .sort((a, b) => a.releaseDate.localeCompare(b.releaseDate));
@@ -70,9 +70,18 @@ async function getDiscography(artistId) {
   return (cache[artistId] = { artist, albums, main: main.length ? main : albums });
 }
 // iTunes has no album-type field, so classify by name + size.
+// Albums only by default; the toggle adds EPs and singles to the review flow, rankings and chart.
+function scopeOf(st, d) {
+  return st.withSingles ? d.albums.filter(a => a.kind !== 'other') : d.main;
+}
+const scopeToggle = st => `<label class="switch"><input type="checkbox" id="withSingles" ${st.withSingles ? 'checked' : ''}>
+  <span></span>Include EPs &amp; singles</label>`;
+function wireScope(st, rerender) {
+  const c = $('#withSingles'); if (c) c.onchange = () => { st.withSingles = c.checked; save(); rerender(); };
+}
 function kindOf(a) {
   const n = a.collectionName;
-  if (/\b(live|unplugged)\b|in concert|greatest hits|best of|the essential|anthology|collection|remix|\bRMX\b|\bdis[ck] \d|instrumentals?\b|karaoke|tribute|b-sides|rarities/i.test(n)) return 'other';
+  if (/\b(live|unplugged)\b|in concert|greatest hits|best of|the essential|anthology|collection|remix|\bmix\)|\bRMX\b|\bdis[ck] \d|instrumentals?\b|karaoke|tribute|b-sides|rarities/i.test(n)) return 'other';
   if (/ - single$/i.test(n) || a.trackCount <= 3) return 'single';
   if (/ - ep$|\bEP\b/i.test(n) || a.trackCount <= 6) return 'ep';
   return 'album';
@@ -257,9 +266,12 @@ const TABS = [['albums', 'Discography'], ['time', 'Over time'], ['albumtiers', '
 
 async function artistPage(id, tab = 'albums', sub) {
   view.innerHTML = `<p class="muted">Loading discography…</p>`;
-  const { artist, albums, main } = await getDiscography(id);
+  const disco = await getDiscography(id);
+  const { artist, albums } = disco;
   if (!artist) { view.innerHTML = `<p class="muted">Artist not found.</p>`; return; }
   const st = artistState(id);
+  const main = scopeOf(st, disco);
+  const unit = st.withSingles ? 'releases' : 'albums';
   const latest = main.at(-1);
   st.name = artist.artistName; st.art = art(latest?.artworkUrl100, 300); save();
   const done = main.filter(a => reviewed(st, a)).length;
@@ -268,14 +280,15 @@ async function artistPage(id, tab = 'albums', sub) {
 
   view.innerHTML = `
     <div class="hero"><a href="#/album/${id}/${latest.collectionId}"><img src="${esc(art(latest.artworkUrl100, 400))}" alt=""></a>
-      <div><div class="muted">Artist</div><h1>${esc(artist.artistName)}</h1>
+      <div><div class="muted">Artist</div><h1>${esc(artist.artistName)}</h1>${scopeToggle(st)}
       <div class="muted">Latest: <a href="#/album/${id}/${latest.collectionId}"><b>${esc(latest.collectionName)}</b></a> (${year(latest.releaseDate)})</div>
       <div class="prog"><div style="width:${pct}%"></div></div>
-      <div class="muted">${done} / ${main.length} albums reviewed</div>
+      <div class="muted">${done} / ${main.length} ${unit} reviewed</div>
       <div class="tools">${nextUp
         ? `<a class="btn primary" href="#/album/${id}/${nextUp.collectionId}">${done ? 'Continue' : 'Start'} reviewing: ${esc(nextUp.collectionName)} →</a>`
         : `<a class="btn primary" href="#/artist/${id}/time">All albums reviewed. See your verdict →</a>`}</div></div></div>
     <div class="tabs">${TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="tab"></div>`;
+  wireScope(st, () => artistPage(id, tab, sub));
   view.querySelector('.tabs').onclick = e => { const t = e.target.dataset.tab; if (t) location.hash = `#/artist/${id}/${t}`; };
   const el = $('#tab');
 
@@ -319,7 +332,7 @@ async function artistPage(id, tab = 'albums', sub) {
   }
 
   if (tab === 'albumtiers') {
-    const pool = albums.filter(a => a.kind === 'album' || tierOf(st, 'albums', a.collectionId));
+    const pool = albums.filter(a => main.includes(a) || tierOf(st, 'albums', a.collectionId));
     tierBoard(el, st, 'albums', pool, {
       id: a => a.collectionId, title: a => a.collectionName, img: a => a.artworkUrl100, heading: `${artist.artistName}: album tier list`,
     });
@@ -357,7 +370,7 @@ async function artistPage(id, tab = 'albums', sub) {
     const tierRank = t => { const x = tierOf(st, 'songs', t.trackId); return x ? TIERS.indexOf(x) : 9; };
     const list = ordered(songs, st.songOrder, t => t.trackId);
     el.innerHTML = `<div class="tools"><button id="share">Copy top 25 as text</button><button id="bytier">Order by tier</button><button id="reset">Reset</button></div>
-      <p class="muted">${songs.length} songs from the main albums. Tip: tier them first, hit “Order by tier”, then fine-tune by dragging.</p>
+      <p class="muted">${songs.length} songs from the ${unit}. Tip: tier them first, hit “Order by tier”, then fine-tune by dragging.</p>
       <ul class="list">${list.map((t, i) => songRow(t, i, st, true)).join('')}</ul>`;
     if (!st.songOrder.length) { st.songOrder = list.map(t => String(t.trackId)); save(); }
     const ul = $('.list', el);
@@ -418,16 +431,18 @@ function wireSongRows(ul, tracks, st, after) {
 
 async function albumPage(artistId, cid) {
   view.innerHTML = `<p class="muted">Loading album…</p>`;
-  const [{ albums, main }, tracks] = await Promise.all([getDiscography(artistId), getTracks(cid)]);
+  const [disco, tracks] = await Promise.all([getDiscography(artistId), getTracks(cid)]);
+  const { albums } = disco;
   const album = albums.find(a => String(a.collectionId) === String(cid)) || tracks[0];
   const st = artistState(artistId);
+  const main = scopeOf(st, disco);
   const ok = 'o' + cid;
   st[ok] ||= [];
   const list = ordered(tracks, st[ok], t => t.trackId);
   const total = tracks.reduce((s, t) => s + (t.trackTimeMillis || 0), 0);
-  const seq = album.kind === 'album' ? main : albums.filter(a => a.kind === album.kind); // step through same kind, oldest → newest
+  const seq = main.includes(album) ? main : albums.filter(a => a.kind === album.kind); // step through same kind, oldest → newest
   const i = seq.indexOf(album), prev = seq[i - 1], next = seq[i + 1];
-  const pos = i >= 0 ? `${album.kind === 'album' ? 'Album' : 'Release'} ${i + 1} of ${seq.length}` : '';
+  const pos = i >= 0 ? `${seq === main && !st.withSingles ? 'Album' : 'Release'} ${i + 1} of ${seq.length}` : '';
   const verdict = () => {
     const sc = albumScore(st, album, tracks);
     return `${sc.rated} / ${tracks.length} songs rated${sc.avg != null ? ` · song average ≈ <b>${scoreTier(sc.avg)}</b>` : ''}`;
