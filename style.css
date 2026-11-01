@@ -88,3 +88,64 @@ h2{margin:32px 0 12px;font-size:20px}
 .nav{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px}
 .nav span{display:flex;gap:16px}
 @media(max-width:600px){.row .ctl,.row .handle{display:none}.tierbtns button{width:26px;height:28px}.tlabel{width:44px;font-size:20px}.chip.albums{width:58px;height:58px}}
+/* main-discography flow */
+.btn{display:inline-block;background:var(--line);padding:10px 16px;border-radius:10px;font-weight:600}
+.btn.primary{background:var(--accent);color:#fff}
+.hero a img{display:block}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 16px}
+.chipf{padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:14px}
+.chipf span{color:var(--muted);margin-left:4px}
+.chipf.on{background:var(--text);color:var(--bg)}.chipf.on span{color:var(--bg)}
+.verdict{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:18px 0}
+.verdict h2{margin:6px 0 10px}
+.verdict .tierbtns button{width:44px;height:44px;font-size:18px}
+.small{font-size:13px}
+.arc{position:relative;background:var(--card);border-radius:12px;padding:8px}
+.arc svg{width:100%;height:auto;display:block}
+.arc .grid{stroke:var(--line);stroke-width:1}
+.arc .ylab{fill:var(--muted);font-size:12px;font-weight:700;text-anchor:end}
+.arc .xlab{fill:var(--muted);font-size:11px;text-anchor:middle}
+.arc .line{fill:none;stroke:var(--text);stroke-width:2;opacity:.5}
+.arc .dot{fill:var(--tc);stroke:var(--card);stroke-width:2}
+.arc .todo{fill:none;stroke:var(--muted);stroke-width:1.5}
+.arc .hit{fill:transparent;cursor:pointer}
+.tip{position:absolute;width:180px;background:#000e;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;pointer-events:none}
+.tip.hidden{display:none}
+.rlist{list-style:none;padding:0;margin:0}
+.rlist li{display:flex;align-items:center;gap:12px;padding:6px 10px;background:var(--card);border-radius:10px;margin-bottom:6px}
+.rlist li a{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.rlist .rk{width:24px;text-align:right;font-weight:800;color:var(--muted)}
+.rlist img{width:44px;height:44px;border-radius:6px}
+.badge2{background:var(--tc);color:#111;font-weight:800;border-radius:6px;padding:2px 8px;font-size:13px}
+.mv{width:40px;text-align:right;font-size:12px;color:var(--muted)}.mv.up{color:#3ddc84}.mv.down{color:var(--accent)}.mv.new{color:var(--gold)}
+.hrow{display:flex;gap:12px;align-items:center;margin-bottom:8px}
+.hrow>span{width:90px;flex:none;font-size:13px}
+.hcovers{display:flex;gap:4px;overflow-x:auto}.hcovers img{width:40px;height:40px;border-radius:4px}
+.tbadge{display:none}
+.scrim{position:fixed;inset:0;background:#0008;opacity:0;pointer-events:none;transition:.2s;z-index:20}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:#1b1b21;border-radius:20px 20px 0 0;padding:10px 16px calc(16px + env(safe-area-inset-bottom));
+  transform:translateY(105%);transition:transform .25s ease;box-shadow:0 -10px 40px #000a}
+.sheet.open{transform:none}
+.sh-grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px}
+.sh-head{display:flex;gap:14px;align-items:center}
+.sh-head img{width:72px;height:72px;border-radius:8px;object-fit:cover}
+.sh-title{font-weight:700;font-size:18px;line-height:1.25}
+.sh-tiers{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:16px 0 10px}
+.sh-tiers button{height:56px;font-size:22px;font-weight:800;color:var(--muted)}
+.sh-tiers button.on{background:var(--tc);color:#111}
+.sh-row{display:flex;gap:6px;margin-top:6px}
+.sh-row button{flex:1;padding:12px 6px;font-size:14px}
+.sh-row button[hidden]{display:none}
+.sh-row button:disabled{opacity:.35}
+@media(max-width:600px){
+  main{padding-left:12px;padding-right:12px}
+  .row{gap:10px;padding:8px 10px 8px 6px;cursor:pointer}
+  .row .rk{width:auto;min-width:16px;font-size:13px}
+  .row img{width:44px;height:44px}
+  .row .info div:first-child{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.25}
+  .row .tierbtns,.row .ctl,.row .handle,.row .play{display:none}
+  .row .tbadge{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:8px;font-weight:800;background:var(--line);color:var(--muted)}
+  .row .tbadge[class*="t-"]{background:var(--tc);color:#111}
+  .hero img{width:120px}
+}
