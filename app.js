@@ -199,7 +199,7 @@ function wireSongRows(ul, tracks, st, after) {
 // ---------- views ----------
 function home() {
   const mine = Object.entries(store).filter(([k, s]) => k !== '_prefs' && s.name);
-  view.innerHTML = `<div class="empty"><h1>Listen anywhere.<br>Rate it here.</h1>
+  view.innerHTML = `<div class="empty"><h1>Listen anywhere.<br><em>Rate it here.</em></h1>
     <p class="muted">Pick an artist and play their albums wherever you listen. Tap S–F on each song as it plays.<br>
     Album ratings and rankings build themselves from your song ratings. Override any you disagree with.</p></div>
     ${mine.length ? `<h2>Your artists</h2><div class="grid">${mine.map(([id, s]) => `
@@ -246,16 +246,19 @@ async function artistPage(id, tab = 'albums', sub) {
   const pct = main.length ? Math.round((done / main.length) * 100) : 0;
   const nextUp = main.find((a, i) => !ratings[i].done);
 
+  const nextHref = nextUp ? `#/album/${id}/${nextUp.collectionId}` : `#/artist/${id}/rank`;
   view.innerHTML = `
-    <div class="hero"><a href="#/album/${id}/${latest.collectionId}"><img src="${esc(art(latest.artworkUrl100, 400))}" alt=""></a>
-      <div><div class="muted">Artist</div><h1>${esc(artist.artistName)}</h1>
-      <div class="muted">Latest: <a href="#/album/${id}/${latest.collectionId}"><b>${esc(latest.collectionName)}</b></a> (${year(latest.firstDate)})</div>
-      <div class="prog"><div style="width:${pct}%"></div></div>
-      <div class="muted">${done} / ${main.length} ${unit} fully rated</div>
-      <div class="tools">${nextUp
-        ? `<a class="btn primary" href="#/album/${id}/${nextUp.collectionId}">${done ? 'Continue' : 'Start'}: ${esc(nextUp.collectionName)} →</a>`
-        : `<a class="btn primary" href="#/artist/${id}/rank">All rated. See your ranking →</a>`}</div>
-      ${toggles(st)}</div></div>
+    <section class="bento artist-bento">
+      <a class="tile b-cover" href="#/album/${id}/${latest.collectionId}"><img src="${esc(art(latest.artworkUrl100, 600))}" alt=""></a>
+      <div class="tile b-title">
+        <div class="eyebrow">Artist</div>
+        <h1>${esc(artist.artistName)}</h1>
+        <dl class="facts"><div><dt>${unit}</dt><dd>${main.length}</dd></div><div><dt>Latest</dt><dd><a href="#/album/${id}/${latest.collectionId}">${esc(latest.collectionName)}</a></dd></div><div><dt>Since</dt><dd>${year(main[0]?.firstDate)}</dd></div></dl>
+      </div>
+      <div class="tile b-progress"><div class="eyebrow">Fully rated</div><div class="num">${done}<span>/${main.length}</span></div><div class="bar"><div style="width:${pct}%"></div></div></div>
+      <div class="tile b-settings"><div class="eyebrow">Show</div>${toggles(st)}</div>
+      <a class="tile b-next" href="${nextHref}"><span class="eyebrow">${nextUp ? (done ? 'Continue with' : 'Start with') : 'All rated'}</span><b>${nextUp ? esc(nextUp.collectionName) : 'See your ranking'}</b><span class="arrow">→</span></a>
+    </section>
     <div class="tabs">${TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="tab"></div>`;
   wireToggles(st, () => artistPage(id, tab, sub));
   view.querySelector('.tabs').onclick = e => { const t = e.target.dataset.tab; if (t) location.hash = `#/artist/${id}/${t}`; };
@@ -281,11 +284,11 @@ async function artistPage(id, tab = 'albums', sub) {
     const unrated = main.filter(a => !ranked.some(r => r.a === a));
     el.innerHTML = `<div class="tools"><button id="share">Copy ranking as text</button></div>
       <p class="muted">Ranked automatically from your song ratings. Open an album to override its rating.</p>
-      ${ranked.length ? `<ol class="rlist">${ranked.map((r, i) => `<li>
+      ${ranked.length ? `<div class="tile"><ol class="rlist">${ranked.map((r, i) => `<li>
         <span class="rk">${i + 1}</span><img src="${esc(art(r.a.artworkUrl100, 100))}" alt="">
         <a href="#/album/${id}/${r.a.collectionId}"><div>${esc(r.a.collectionName)}</div>
           <div class="s muted">${year(r.a.firstDate)} · ${r.mine ? `your call (auto ${r.auto || '–'})` : `auto · ${r.rated}/${r.total} songs`}</div></a>
-        <span class="badge2 t-${r.final}">${r.final}</span></li>`).join('')}</ol>` : '<p class="muted">Rate some songs to see your ranking.</p>'}
+        <span class="badge2 t-${r.final}">${r.final}</span></li>`).join('')}</ol></div>` : '<p class="muted">Rate some songs to see your ranking.</p>'}
       ${unrated.length ? `<h2>Not rated yet</h2><div class="grid small-grid">${unrated.map(a => `<a class="card" href="#/album/${id}/${a.collectionId}">
         <img loading="lazy" src="${esc(art(a.artworkUrl100, 200))}" alt=""><div class="t">${esc(a.collectionName)}</div></a>`).join('')}</div>` : ''}`;
     $('#share').onclick = () => copyText(`My ${artist.artistName} album ranking\n` + ranked.map((r, i) => `${i + 1}. ${r.a.collectionName} (${r.final})`).join('\n'));
@@ -298,8 +301,8 @@ async function artistPage(id, tab = 'albums', sub) {
     const byTier = TIERS.map(T => [T, rated.filter(t => tierOf(st, 'songs', songKey(t)) === T)]).filter(([, xs]) => xs.length);
     el.innerHTML = `<div class="tools"><button id="share">Copy as tier list</button></div>
       <p class="muted">${rated.length} of ${songs.length} songs rated, grouped by tier. Tap a song to change its rating.</p>
-      ${byTier.map(([T, xs]) => `<h2 class="tierhead"><span class="badge2 t-${T}">${T}</span> <span class="muted">${xs.length}</span></h2>
-        <ul class="list">${xs.map(t => songRow(t, st, '', albumOf.get(songKey(t)).collectionName)).join('')}</ul>`).join('') || '<p class="muted">No songs rated yet.</p>'}`;
+      ${byTier.map(([T, xs]) => `<div class="tile tier-tile"><div class="tile-head"><h2 class="tierhead"><span class="badge2 t-${T}">${T}</span></h2><span class="eyebrow">${xs.length} songs</span></div>
+        <ul class="list">${xs.map(t => songRow(t, st, '', albumOf.get(songKey(t)).collectionName)).join('')}</ul></div>`).join('') || '<p class="muted">No songs rated yet.</p>'}`;
     el.querySelectorAll('.list').forEach(ul => wireSongRows(ul, songs, st));
     $('#share').onclick = () => copyText(`My ${artist.artistName} songs\n` + byTier.map(([T, xs]) => `${T}: ${xs.map(t => t.trackName).join(', ')}`).join('\n'));
   }
@@ -311,15 +314,14 @@ async function artistPage(id, tab = 'albums', sub) {
     const byKey = new Map(main.map(a => [albumKey(a), a]));
     const pts = main.map((a, i) => ({ a, ...ratings[i] }));
     el.innerHTML = `
-      <h2>Career arc</h2>
-      <p class="muted">Each album in release order, with its final rating (your override, or the average of its songs).</p>
-      ${arcChart(pts, id)}
-      ${prev ? `<h2>Movement since ${prev.day}</h2><ol class="rlist">${ranked.map((r, i) => {
+      <div class="tile"><div class="tile-head"><h2>Career arc</h2><span class="eyebrow">Final rating per album</span></div>
+      ${arcChart(pts, id)}</div>
+      ${prev ? `<div class="tile"><div class="tile-head"><h2>Movement</h2><span class="eyebrow">since ${prev.day}</span></div><ol class="rlist">${ranked.map((r, i) => {
         const was = prev.order.indexOf(albumKey(r.a));
         const mv = was < 0 ? '<span class="mv new">new</span>' : was > i ? `<span class="mv up">▲${was - i}</span>` : was < i ? `<span class="mv down">▼${i - was}</span>` : '<span class="mv">–</span>';
         return `<li><span class="rk">${i + 1}</span><img src="${esc(art(r.a.artworkUrl100, 100))}" alt=""><a href="#/album/${id}/${r.a.collectionId}">${esc(r.a.collectionName)}</a>
           <span class="badge2 t-${r.final}">${r.final}</span>${mv}</li>`;
-      }).join('')}</ol>` : ''}
+      }).join('')}</ol></div>` : ''}
       ${st.history.length > 1 ? `<h2>Your ranking by day</h2><div class="hist">${[...st.history].reverse().map(h => `
         <div class="hrow"><span class="muted">${h.day}</span><div class="hcovers">${h.order.slice(0, 10).map((k, i) => byKey.get(k) ? `<img title="${i + 1}. ${esc(byKey.get(k).collectionName)}" src="${esc(art(byKey.get(k).artworkUrl100, 100))}" alt="">` : '').join('')}</div></div>`).join('')}</div>`
         : '<p class="muted small">Come back on another day to see how your ranking moves.</p>'}`;
@@ -379,29 +381,39 @@ async function albumPage(artistId, cid) {
   const edLabel = (e, n) => n === 0 ? `Standard · ${e.trackCount}` : `Deluxe · ${e.trackCount}`;
   const ak = albumKey(album);
 
-  view.innerHTML = `<div class="nav"><a class="muted" href="#/artist/${artistId}">← ${esc(album.artistName)}</a>
-      <span>${prev ? `<a class="muted" href="#/album/${artistId}/${prev.collectionId}">‹ Prev</a>` : ''}
-      <span class="muted">${pos}</span>
-      ${next ? `<a class="muted" href="#/album/${artistId}/${next.collectionId}">Next ›</a>` : ''}</span></div>
-    <div class="hero"><img src="${esc(art(album.artworkUrl100, 600))}" alt="">
-      <div><div class="muted">${year(album.firstDate)} · ${tracks.length} songs · ${Math.round(total / 60000)} min</div>
-      <h1>${esc(album.collectionName)}</h1>
-      ${new Set(editions.map(e => e.trackCount)).size > 1 ? `<div class="chips">${[...new Map(editions.map(e => [e.trackCount, e])).values()].map((e, n) => `<a class="chipf ${e.trackCount === album.trackCount ? 'on' : ''}" href="#/album/${artistId}/${e.collectionId}">${edLabel(e, n)} songs</a>`).join('')}</div>` : ''}
-      ${listenLinks(album.artistName, album.collectionName, album.collectionViewUrl)}</div></div>
-    <h2>Rate each song as it plays</h2>
-    <ul class="list">${tracks.map((t, n) => songRow(t, st, n + 1)).join('')}</ul>
-    <div class="verdict" id="verdict"></div>
-    <div class="nextbar">${next ? `<a class="btn primary" href="#/album/${artistId}/${next.collectionId}">Next album: ${esc(next.collectionName)} (${year(next.firstDate)}) →</a>`
-      : `<a class="btn primary" href="#/artist/${artistId}/rank">That's the latest. See your ranking →</a>`}</div>`;
+  const editionChips = new Set(editions.map(e => e.trackCount)).size > 1
+    ? `<div class="chips">${[...new Map(editions.map(e => [e.trackCount, e])).values()].map((e, n) => `<a class="chipf ${e.trackCount === album.trackCount ? 'on' : ''}" href="#/album/${artistId}/${e.collectionId}">${edLabel(e, n)}</a>`).join('')}</div>` : '';
+  view.innerHTML = `
+    <div class="nav"><a href="#/artist/${artistId}">← ${esc(album.artistName)}</a>
+      <span>${prev ? `<a href="#/album/${artistId}/${prev.collectionId}">‹ Prev</a>` : ''}${next ? `<a href="#/album/${artistId}/${next.collectionId}">Next ›</a>` : ''}</span></div>
+    <section class="bento album-bento">
+      <div class="tile b-cover"><img src="${esc(art(album.artworkUrl100, 600))}" alt=""></div>
+      <div class="tile b-title">
+        <div class="eyebrow">${pos}</div>
+        <h1>${esc(album.collectionName)}</h1>
+        <dl class="facts"><div><dt>Year</dt><dd>${year(album.firstDate)}</dd></div><div><dt>Songs</dt><dd>${tracks.length}</dd></div><div><dt>Length</dt><dd>${Math.round(total / 60000)}m</dd></div></dl>
+        ${editionChips}
+      </div>
+      <div class="tile b-score" id="verdict"></div>
+      <div class="tile b-progress" id="progress"></div>
+      <div class="tile b-listen"><div class="eyebrow">Listen on</div>${listenLinks(album.artistName, album.collectionName, album.collectionViewUrl).replace('<span class="muted">Listen on</span>', '')}</div>
+      <div class="tile b-tracks"><div class="tile-head"><h2>Tracks</h2><span class="eyebrow">Tap to rate</span></div>
+        <ul class="list">${tracks.map((t, n) => songRow(t, st, String(n + 1).padStart(2, '0'))).join('')}</ul></div>
+      ${next ? `<a class="tile b-next" href="#/album/${artistId}/${next.collectionId}"><span class="eyebrow">Next album</span><b>${esc(next.collectionName)}</b><span class="arrow">→</span></a>`
+        : `<a class="tile b-next" href="#/artist/${artistId}/rank"><span class="eyebrow">That's the latest</span><b>See your ranking</b><span class="arrow">→</span></a>`}
+    </section>`;
 
   const renderVerdict = () => {
     const r = albumRating(st, album, tracks);
     $('#verdict').innerHTML = `
-      <div class="vrow"><div><div class="muted small">Album rating</div>
-        <div class="vbig">${r.final ? `<span class="badge2 big t-${r.final}">${r.final}</span>` : '<span class="muted">–</span>'}
-        <span class="muted">${r.mine ? `Your call · songs average ${r.auto || '–'}` : r.auto ? `Auto · average of ${r.rated}/${r.total} songs` : 'Rate songs to get an automatic album rating'}</span></div></div></div>
-      <div class="muted small">${r.mine ? 'Tap your pick again to go back to the automatic rating.' : 'Disagree? Pick the album rating yourself:'}</div>
+      <div class="eyebrow">${r.mine ? 'Your call' : 'Album rating · auto'}</div>
+      <div class="score ${r.final ? 't-' + r.final : ''}">${r.final || '–'}</div>
+      <div class="small muted">${r.mine ? `Songs average ${r.auto || '–'}. Tap your pick again to undo.` : r.auto ? `Average of ${r.rated} rated songs. Disagree? Pick one:` : 'Rate songs to get a rating.'}</div>
       ${tierBtns(st, 'albums', ak)}`;
+    const pct = r.total ? Math.round(r.rated / r.total * 100) : 0;
+    $('#progress').innerHTML = `<div class="eyebrow">Rated</div>
+      <div class="num">${r.rated}<span>/${r.total}</span></div>
+      <div class="bar"><div style="width:${pct}%"></div></div>`;
   };
   renderVerdict();
   wireSongRows($('.list'), tracks, st, renderVerdict);
