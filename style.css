@@ -1,39 +1,16 @@
-/* MusicRank. Three themes share this structure; each only swaps tokens.
-   art   (default): warm neutral dark, accent + backdrop pulled from the current cover art
-   paper:           record-store / liner-notes light theme with a serif display face
-   night:           deep navy, single amber accent, condensed display face */
+/* tokens */
 :root{
-  --bg:#0f0e0d; --surface:#181614; --surface-2:#211e1b; --line:#2d2925;
-  --text:#f4efe6; --muted:#a69e93; --faint:#6e675f;
-  --accent:#f0b955; --accent-ink:#1b1305;
-  --header:rgba(15,14,13,.72); --shade:rgba(0,0,0,.35);
-  --radius:14px; --radius-sm:9px;
-  --display:'Bricolage Grotesque',system-ui,sans-serif; --display-w:800; --display-ls:-.02em; --display-tt:none;
-  --body:'Instrument Sans',system-ui,sans-serif;
-  --S:#f4c152; --A:#ee8d4e; --B:#e26d7e; --C:#a884d8; --D:#5f9dd6; --F:#7d8693; --tier-ink:#140f0b;
-  --art-opacity:.45;
-}
-:root[data-theme="paper"]{
-  --bg:#f3eee4; --surface:#fbf8f2; --surface-2:#ebe4d6; --line:#ddd4c3;
-  --text:#1d1a16; --muted:#6f675c; --faint:#a39a8c;
-  --accent:#c2412d; --accent-ink:#fff8f0;
-  --header:rgba(243,238,228,.85); --shade:rgba(60,40,20,.18);
-  --radius:4px; --radius-sm:3px;
-  --display:'Fraunces',Georgia,serif; --display-w:700; --display-ls:-.01em;
-  --body:'Instrument Sans',system-ui,sans-serif;
-  --S:#d9a520; --A:#d9692e; --B:#c4475a; --C:#7c5bb3; --D:#3a78b5; --F:#8a8f96; --tier-ink:#fffaf2;
+  --bg:#e8e7e3; --surface:#ffffff; --surface-2:#f3f2ef; --line:#e7e5e0;
+  --text:#0d0d0d; --muted:#6b6a66; --faint:#a9a7a1;
+  --accent:#ff3d14; --accent-ink:#ffffff;
+  --header:rgba(232,231,227,.85); --shade:rgba(0,0,0,.08);
+  --radius:18px; --radius-sm:10px;
+  --display:'Geist',system-ui,sans-serif; --display-w:600; --display-ls:-.025em; --display-tt:none;
+  --body:'Geist',system-ui,sans-serif;
+  --S:#ffd23f; --A:#ff8a3d; --B:#ff5c8a; --C:#9b7bff; --D:#3d8bff; --F:#b5b3ad; --tier-ink:#0d0d0d;
   --art-opacity:0;
 }
-:root[data-theme="night"]{
-  --bg:#0b1020; --surface:#121a2e; --surface-2:#19233b; --line:#243050;
-  --text:#e9edf7; --muted:#8e9ab5; --faint:#56627f;
-  --accent:#ffb547; --accent-ink:#1a1003;
-  --header:rgba(11,16,32,.78); --shade:rgba(0,0,0,.45);
-  --radius:10px; --radius-sm:7px;
-  --display:'Barlow Condensed',system-ui,sans-serif; --display-w:700; --display-ls:.01em; --display-tt:uppercase;
-  --S:#ffc857; --A:#ff9f5a; --B:#ef7a8e; --C:#b392f0; --D:#6cb4f5; --F:#7f8aa3; --tier-ink:#0b1020;
-  --art-opacity:0;
-}
+/* MusicRank — Swiss × bento: warm grey ground, white tiles, one red-orange accent, Geist. */
 .t-S{--tc:var(--S)}.t-A{--tc:var(--A)}.t-B{--tc:var(--B)}.t-C{--tc:var(--C)}.t-D{--tc:var(--D)}.t-F{--tc:var(--F)}
 
 *{box-sizing:border-box}
@@ -52,10 +29,6 @@ h2{font-size:21px;margin:32px 0 12px}
 .small{font-size:13px}
 .eyebrow{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 
-/* blurred cover art behind the top of artist/album pages (art theme only) */
-.backdrop{position:absolute;inset:0 0 auto 0;height:560px;z-index:-1;overflow:hidden;pointer-events:none}
-.backdrop::before{content:'';position:absolute;inset:-80px;background:var(--art) center/cover;filter:blur(70px) saturate(1.4);opacity:var(--art-opacity)}
-.backdrop::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent 20%,var(--bg) 95%)}
 
 /* header */
 .top{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:14px clamp(16px,4vw,40px);position:sticky;top:0;z-index:5;flex-wrap:wrap;
@@ -235,29 +208,18 @@ main{position:relative;padding:24px clamp(16px,4vw,40px);max-width:1100px;margin
 .switch input:checked+span{background:var(--accent)}
 .switch input:checked+span::after{left:18px}
 
-/* ===== Swiss × Bento (preview: album page) ===== */
-:root[data-theme="swiss"]{
-  --bg:#e8e7e3; --surface:#ffffff; --surface-2:#f3f2ef; --line:#e7e5e0;
-  --text:#0d0d0d; --muted:#6b6a66; --faint:#a9a7a1;
-  --accent:#ff3d14; --accent-ink:#ffffff;
-  --header:rgba(232,231,227,.85); --shade:rgba(0,0,0,.08);
-  --radius:18px; --radius-sm:10px;
-  --display:'Geist',system-ui,sans-serif; --display-w:600; --display-ls:-.025em; --display-tt:none;
-  --body:'Geist',system-ui,sans-serif;
-  --S:#ffd23f; --A:#ff8a3d; --B:#ff5c8a; --C:#9b7bff; --D:#3d8bff; --F:#b5b3ad; --tier-ink:#0d0d0d;
-  --art-opacity:0;
-}
-[data-theme="swiss"] body{font-stretch:100%}
-[data-theme="swiss"] .top{border-bottom:0;background:var(--header)}
-[data-theme="swiss"] body{font-size:15px}
-[data-theme="swiss"] .logo{font-weight:700;font-size:18px;letter-spacing:-.03em}
-[data-theme="swiss"] .search input,[data-theme="swiss"] .search button{padding-top:8px;padding-bottom:8px;font-size:14px}
-[data-theme="swiss"] .search input{border-color:transparent;background:var(--surface)}
-[data-theme="swiss"] .search button{background:var(--text);color:#fff}
-[data-theme="swiss"] .nav{margin:0 2px 12px;font-weight:600}
-[data-theme="swiss"] .nav span{gap:18px}
-[data-theme="swiss"] .eyebrow{font-size:11px;font-weight:500;letter-spacing:.06em;color:var(--muted)}
-[data-theme="swiss"] .nav{font-size:13px;font-weight:500}
+
+body{font-stretch:100%}
+.top{border-bottom:0;background:var(--header)}
+body{font-size:15px}
+.logo{font-weight:700;font-size:18px;letter-spacing:-.03em}
+.search input,.search button{padding-top:8px;padding-bottom:8px;font-size:14px}
+.search input{border-color:transparent;background:var(--surface)}
+.search button{background:var(--text);color:#fff}
+.nav{margin:0 2px 12px;font-weight:600}
+.nav span{gap:18px}
+.eyebrow{font-size:11px;font-weight:500;letter-spacing:.06em;color:var(--muted)}
+.nav{font-size:13px;font-weight:500}
 
 .bento{display:grid;gap:10px;grid-template-columns:repeat(4,1fr)}
 .tile{background:var(--surface);border-radius:var(--radius);padding:16px;min-width:0}
@@ -281,34 +243,34 @@ main{position:relative;padding:24px clamp(16px,4vw,40px);max-width:1100px;margin
 .album-bento .bar div{height:100%;background:var(--accent);border-radius:4px;transition:width .3s}
 .album-bento .b-listen{grid-column:span 4;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px}
 .album-bento .b-listen .links{margin:0}
-[data-theme="swiss"] .links a{background:var(--surface-2);border:0;font-weight:500;font-size:13px;padding:6px 12px}
-[data-theme="swiss"] .links a:hover{background:var(--text);color:#fff}
+.links a{background:var(--surface-2);border:0;font-weight:500;font-size:13px;padding:6px 12px}
+.links a:hover{background:var(--text);color:#fff}
 .album-bento .b-tracks{grid-column:span 4;padding:14px 16px 4px}
 .tile-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
 .tile-head h2{margin:0;font-size:17px}
-[data-theme="swiss"] .album-bento .list{border-top:0}
-[data-theme="swiss"] .album-bento .row{border-bottom:1px solid var(--line);padding:8px 0;gap:12px}
-[data-theme="swiss"] .album-bento .row:last-child{border-bottom:0}
-[data-theme="swiss"] .album-bento .row .rk{font:500 12px var(--display);color:var(--faint);width:20px;text-align:left;font-variant-numeric:tabular-nums}
-[data-theme="swiss"] .album-bento .row .info div:first-child{font-weight:500;font-size:14px}
-[data-theme="swiss"] .album-bento .row .info .s{font-size:12px}
-[data-theme="swiss"] .album-bento .tierbtns button{width:28px;height:28px;font-size:12px;font-weight:600}
-[data-theme="swiss"] .album-bento .play{width:28px;height:28px;font-size:10px}
-[data-theme="swiss"] .tierbtns button{border:0;background:var(--surface-2);color:var(--muted);border-radius:9px}
-[data-theme="swiss"] .tierbtns button.on{background:var(--tc);color:var(--tier-ink)}
-[data-theme="swiss"] .play{border:0;background:var(--surface-2)}
+.album-bento .list{border-top:0}
+.album-bento .row{border-bottom:1px solid var(--line);padding:8px 0;gap:12px}
+.album-bento .row:last-child{border-bottom:0}
+.album-bento .row .rk{font:500 12px var(--display);color:var(--faint);width:20px;text-align:left;font-variant-numeric:tabular-nums}
+.album-bento .row .info div:first-child{font-weight:500;font-size:14px}
+.album-bento .row .info .s{font-size:12px}
+.album-bento .tierbtns button{width:28px;height:28px;font-size:12px;font-weight:600}
+.album-bento .play{width:28px;height:28px;font-size:10px}
+.tierbtns button{border:0;background:var(--surface-2);color:var(--muted);border-radius:9px}
+.tierbtns button.on{background:var(--tc);color:var(--tier-ink)}
+.play{border:0;background:var(--surface-2)}
 .album-bento .b-next{grid-column:span 4;background:var(--accent);color:var(--accent-ink);display:grid;grid-template-columns:1fr auto;align-items:center;padding:14px 18px}
 .album-bento .b-next .eyebrow{color:rgba(255,255,255,.75);grid-column:1}
 .album-bento .b-next b{grid-column:1;font:600 17px/1.2 var(--display);letter-spacing:-.01em;margin-top:2px}
 .album-bento .b-next .arrow{grid-column:2;grid-row:1/3;font:400 22px/1 var(--display)}
-[data-theme="swiss"] .album-bento .chips{margin:0}
-[data-theme="swiss"] .chipf{border:0;background:var(--surface-2);color:var(--text);font-weight:500;font-size:12px;padding:5px 11px}
-[data-theme="swiss"] .chipf.on{background:var(--text);color:#fff}
-[data-theme="swiss"] .sheet{border-top:0}
-[data-theme="swiss"] .sh-title{font-weight:600;font-size:17px;letter-spacing:-.015em}
-[data-theme="swiss"] .sh-tiers button{border:0;background:var(--surface-2);color:var(--text);border-radius:12px;height:48px;font-size:18px;font-weight:600}
-[data-theme="swiss"] .sh-tiers button.on{background:var(--tc)}
-[data-theme="swiss"] .sh-row button{background:var(--surface-2);border-radius:12px;font-weight:500;font-size:13px;padding:10px 6px}
+.album-bento .chips{margin:0}
+.chipf{border:0;background:var(--surface-2);color:var(--text);font-weight:500;font-size:12px;padding:5px 11px}
+.chipf.on{background:var(--text);color:#fff}
+.sheet{border-top:0}
+.sh-title{font-weight:600;font-size:17px;letter-spacing:-.015em}
+.sh-tiers button{border:0;background:var(--surface-2);color:var(--text);border-radius:12px;height:48px;font-size:18px;font-weight:600}
+.sh-tiers button.on{background:var(--tc)}
+.sh-row button{background:var(--surface-2);border-radius:12px;font-weight:500;font-size:13px;padding:10px 6px}
 @media(max-width:600px){
   .bento{grid-template-columns:repeat(2,1fr);gap:8px}
   .tile{padding:14px;border-radius:16px}
@@ -321,9 +283,90 @@ main{position:relative;padding:24px clamp(16px,4vw,40px);max-width:1100px;margin
   .album-bento .num{font-size:32px}
   .album-bento .b-listen,.album-bento .b-tracks,.album-bento .b-next{grid-column:span 2}
   .album-bento .b-tracks{padding:12px 14px 2px}
-  [data-theme="swiss"] .row .tbadge{border:0;background:var(--surface-2);border-radius:9px}
-  [data-theme="swiss"] .row .tbadge[class*="t-"]{background:var(--tc)}
+  .row .tbadge{border:0;background:var(--surface-2);border-radius:9px}
+  .row .tbadge[class*="t-"]{background:var(--tc)}
   .album-bento .b-next b{font-size:16px}
-  [data-theme="swiss"] .row .tbadge{width:28px;height:28px;font-size:13px;font-weight:600}
+  .row .tbadge{width:28px;height:28px;font-size:13px;font-weight:600}
 }
-[data-theme="swiss"] .album-bento .b-score .tierbtns button{width:auto;height:32px}
+.album-bento .b-score .tierbtns button{width:auto;height:32px}
+
+/* global scale (Swiss: calm sizes) */
+h1{font-size:clamp(24px,3.2vw,32px);line-height:1.1}
+h2{font-size:17px;margin:0}
+main > .muted,#tab > .muted,#tab > p{font-size:13px;margin:12px 2px}
+.empty{padding:56px 0 28px;text-align:left;max-width:620px}
+.empty h1{font-size:clamp(30px,5vw,44px);line-height:1.05}
+.empty p{margin:14px 0 0;font-size:15px}
+main > h2{margin:24px 2px 12px}
+.card img{box-shadow:none;border-radius:12px}
+.card .t{font-weight:500;font-size:13px}
+.badge{border-radius:6px;font-size:12px;box-shadow:none}
+
+/* artist bento */
+.artist-bento .b-cover{grid-column:span 2;grid-row:span 2;padding:0;overflow:hidden}
+.artist-bento .b-cover img{width:100%;height:100%;aspect-ratio:1;object-fit:cover}
+.artist-bento .b-title{grid-column:span 2;display:flex;flex-direction:column;justify-content:space-between;gap:14px}
+.artist-bento .b-title h1{margin:4px 0 0}
+.artist-bento .facts dd a{border-bottom:1px solid var(--line)}
+.artist-bento .facts > div:nth-child(2){min-width:0}
+.artist-bento .facts dd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.artist-bento .b-progress{display:flex;flex-direction:column}
+.artist-bento .num{font:600 36px/1 var(--display);letter-spacing:-.03em;margin:8px 0 auto;font-variant-numeric:tabular-nums}
+.artist-bento .num span{color:var(--faint);font-size:.5em;font-weight:500}
+.artist-bento .bar{height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden;margin-top:14px}
+.artist-bento .bar div{height:100%;background:var(--accent)}
+.artist-bento .b-settings .toggles{flex-direction:column;gap:2px;margin-top:8px}
+.artist-bento .b-settings .switch{font-size:13px;color:var(--text)}
+.artist-bento .b-next{grid-column:span 4;background:var(--accent);color:var(--accent-ink);display:grid;grid-template-columns:1fr auto;align-items:center;padding:14px 18px}
+.artist-bento .b-next .eyebrow{color:rgba(255,255,255,.75)}
+.artist-bento .b-next b{grid-column:1;font:600 17px/1.2 var(--display);margin-top:2px}
+.artist-bento .b-next .arrow{grid-column:2;grid-row:1/3;font-size:22px}
+
+/* tabs: segmented control */
+.tabs{display:flex;gap:2px;margin:14px 0 12px;padding:4px;background:var(--surface);border-radius:999px;border:0;overflow-x:auto}
+.tabs button{flex:1;border-radius:999px;border:0;margin:0;padding:8px 12px;font-size:13px;font-weight:500;color:var(--muted)}
+.tabs button.on{background:var(--text);color:#fff}
+
+/* tab content in tiles */
+#tab > .tile,#tab > div > .tile{margin-bottom:10px}
+.tile .list,.tile .rlist{border-top:0}
+.tile .row,.tile .rlist li{border-bottom:1px solid var(--line);padding:8px 0}
+.tile .row:last-child,.tile .rlist li:last-child{border-bottom:0}
+.tile .row .info div:first-child{font-weight:500;font-size:14px}
+.tile .row .info .s{font-size:12px}
+.tile .tierbtns button{width:28px;height:28px;font-size:12px;font-weight:600}
+.tile .play{width:28px;height:28px;font-size:10px}
+.rlist .rk{font:500 13px var(--display);width:22px;color:var(--faint);text-align:left}
+.rlist li:first-child .rk{color:var(--accent)}
+.rlist img{width:40px;height:40px;border-radius:8px}
+.rlist li a{font-weight:500;font-size:14px}
+.badge2{border-radius:6px;font-size:12px;font-weight:600;padding:2px 8px}
+.tierhead{margin:0}
+.tier-tile .tile-head{margin-bottom:2px}
+.arc{background:none;border:0;padding:4px 0 0}
+#tab .tools{margin:0 0 10px}
+#tab .tools button{background:var(--surface);font-size:13px;font-weight:500;border-radius:999px;padding:7px 14px}
+#tab h2{margin:20px 2px 10px}
+#tab .tile h2{margin:0}
+.chips{margin:0 0 14px}
+
+@media(max-width:600px){
+  .artist-bento .b-title{grid-column:span 2;order:0;background:none;padding:6px 4px 10px}
+  .artist-bento .b-cover{grid-column:span 1;grid-row:span 1;order:1}
+  .artist-bento .b-progress{order:2}
+  .artist-bento .b-next{grid-column:span 2;order:3}
+  .artist-bento .b-settings{grid-column:span 2;order:4}
+  .artist-bento .b-settings .toggles{flex-direction:row;flex-wrap:wrap;gap:2px 16px}
+  .artist-bento .num{font-size:32px}
+  .artist-bento .b-next b{font-size:16px}
+  .tabs{border-radius:14px}
+  .tabs button{padding:8px 10px;font-size:12px}
+}
+.switch span{background:#d9d7d1}
+.switch span::after{background:#fff}
+@media(min-width:601px){
+  .artist-bento .b-cover,.album-bento .b-cover{grid-column:span 1;grid-row:span 2}
+  .artist-bento .b-title,.album-bento .b-title{grid-column:span 3}
+  .artist-bento .b-settings{grid-column:span 2}
+  .album-bento .b-score{grid-column:span 2}
+}

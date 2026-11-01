@@ -145,47 +145,6 @@ const listenLinks = (artistName, title, appleUrl) => {
     <a target="_blank" rel="noopener" href="https://music.youtube.com/search?q=${q}">YouTube Music</a></div>`;
 };
 
-// ---------- theme + album-art color ----------
-// ?theme=paper|night|art previews a theme (and remembers it).
-const qTheme = new URLSearchParams(location.search).get('theme');
-if (qTheme) { prefs.theme = qTheme; save(); }
-document.documentElement.dataset.theme = prefs.theme || 'swiss';
-const DEFAULT_ACCENT = getComputedStyle(document.documentElement).getPropertyValue('--accent');
-// Pick the most vibrant color from a tiny copy of the cover and make it readable on the dark base.
-const tintCache = {};
-async function tint(url) {
-  const root = document.documentElement.style;
-  if (!url || (prefs.theme || 'art') !== 'art') { root.removeProperty('--accent'); root.removeProperty('--accent-ink'); return; }
-  const small = art(url, 40);
-  let c = tintCache[small];
-  if (!c) {
-    try {
-      const img = new Image(); img.crossOrigin = 'anonymous'; img.src = small; await img.decode();
-      const cv = document.createElement('canvas'); cv.width = cv.height = 40;
-      const x = cv.getContext('2d'); x.drawImage(img, 0, 0, 40, 40);
-      const d = x.getImageData(0, 0, 40, 40).data; let best = null, bestScore = -1;
-      for (let i = 0; i < d.length; i += 4) {
-        const [h, s, l] = rgbToHsl(d[i], d[i + 1], d[i + 2]);
-        const score = s * (1 - Math.abs(l - .5) * 1.6);
-        if (score > bestScore) { bestScore = score; best = [h, s, l]; }
-      }
-      // Low-saturation covers (black & white art) fall back to the warm default.
-      c = tintCache[small] = best && best[1] > .25 ? `hsl(${Math.round(best[0] * 360)} ${Math.round(Math.min(.85, Math.max(.55, best[1])) * 100)}% 64%)` : null;
-    } catch { c = null; }
-  }
-  if (c) { root.setProperty('--accent', c); root.setProperty('--accent-ink', '#14100b'); }
-  else { root.removeProperty('--accent'); root.removeProperty('--accent-ink'); }
-}
-function rgbToHsl(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
-  if (mx === mn) return [0, 0, l];
-  const dd = mx - mn, s = l > .5 ? dd / (2 - mx - mn) : dd / (mx + mn);
-  const h = mx === r ? (g - b) / dd + (g < b ? 6 : 0) : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4;
-  return [h / 6, s, l];
-}
-const backdrop = url => `<div class="backdrop" style="--art:url('${esc(art(url, 300))}')"></div>`;
-
 // ---------- optional preview player ----------
 const audio = $('#audio');
 let playing = null;
@@ -240,7 +199,6 @@ function wireSongRows(ul, tracks, st, after) {
 // ---------- views ----------
 function home() {
   const mine = Object.entries(store).filter(([k, s]) => k !== '_prefs' && s.name);
-  tint(null);
   view.innerHTML = `<div class="empty"><h1>Listen anywhere.<br><em>Rate it here.</em></h1>
     <p class="muted">Pick an artist and play their albums wherever you listen. Tap S–F on each song as it plays.<br>
     Album ratings and rankings build themselves from your song ratings. Override any you disagree with.</p></div>
@@ -249,7 +207,6 @@ function home() {
 }
 
 async function search(q) {
-  tint(null);
   view.innerHTML = `<p class="muted">Searching…</p>`;
   const d = await itunes('search', { term: q, entity: 'musicArtist', limit: 12 });
   if (!d.results.length) { view.innerHTML = `<p class="muted">No artists found for “${esc(q)}”.</p>`; return; }
@@ -289,17 +246,19 @@ async function artistPage(id, tab = 'albums', sub) {
   const pct = main.length ? Math.round((done / main.length) * 100) : 0;
   const nextUp = main.find((a, i) => !ratings[i].done);
 
-  tint(latest.artworkUrl100);
-  view.innerHTML = `${backdrop(latest.artworkUrl100)}
-    <div class="hero"><a href="#/album/${id}/${latest.collectionId}"><img src="${esc(art(latest.artworkUrl100, 400))}" alt=""></a>
-      <div><div class="eyebrow">Artist</div><h1>${esc(artist.artistName)}</h1>
-      <div class="muted">Latest: <a href="#/album/${id}/${latest.collectionId}"><b>${esc(latest.collectionName)}</b></a> (${year(latest.firstDate)})</div>
-      <div class="prog"><div style="width:${pct}%"></div></div>
-      <div class="muted">${done} / ${main.length} ${unit} fully rated</div>
-      <div class="tools">${nextUp
-        ? `<a class="btn primary" href="#/album/${id}/${nextUp.collectionId}">${done ? 'Continue' : 'Start'}: ${esc(nextUp.collectionName)} →</a>`
-        : `<a class="btn primary" href="#/artist/${id}/rank">All rated. See your ranking →</a>`}</div>
-      ${toggles(st)}</div></div>
+  const nextHref = nextUp ? `#/album/${id}/${nextUp.collectionId}` : `#/artist/${id}/rank`;
+  view.innerHTML = `
+    <section class="bento artist-bento">
+      <a class="tile b-cover" href="#/album/${id}/${latest.collectionId}"><img src="${esc(art(latest.artworkUrl100, 600))}" alt=""></a>
+      <div class="tile b-title">
+        <div class="eyebrow">Artist</div>
+        <h1>${esc(artist.artistName)}</h1>
+        <dl class="facts"><div><dt>${unit}</dt><dd>${main.length}</dd></div><div><dt>Latest</dt><dd><a href="#/album/${id}/${latest.collectionId}">${esc(latest.collectionName)}</a></dd></div><div><dt>Since</dt><dd>${year(main[0]?.firstDate)}</dd></div></dl>
+      </div>
+      <div class="tile b-progress"><div class="eyebrow">Fully rated</div><div class="num">${done}<span>/${main.length}</span></div><div class="bar"><div style="width:${pct}%"></div></div></div>
+      <div class="tile b-settings"><div class="eyebrow">Show</div>${toggles(st)}</div>
+      <a class="tile b-next" href="${nextHref}"><span class="eyebrow">${nextUp ? (done ? 'Continue with' : 'Start with') : 'All rated'}</span><b>${nextUp ? esc(nextUp.collectionName) : 'See your ranking'}</b><span class="arrow">→</span></a>
+    </section>
     <div class="tabs">${TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="tab"></div>`;
   wireToggles(st, () => artistPage(id, tab, sub));
   view.querySelector('.tabs').onclick = e => { const t = e.target.dataset.tab; if (t) location.hash = `#/artist/${id}/${t}`; };
@@ -325,11 +284,11 @@ async function artistPage(id, tab = 'albums', sub) {
     const unrated = main.filter(a => !ranked.some(r => r.a === a));
     el.innerHTML = `<div class="tools"><button id="share">Copy ranking as text</button></div>
       <p class="muted">Ranked automatically from your song ratings. Open an album to override its rating.</p>
-      ${ranked.length ? `<ol class="rlist">${ranked.map((r, i) => `<li>
+      ${ranked.length ? `<div class="tile"><ol class="rlist">${ranked.map((r, i) => `<li>
         <span class="rk">${i + 1}</span><img src="${esc(art(r.a.artworkUrl100, 100))}" alt="">
         <a href="#/album/${id}/${r.a.collectionId}"><div>${esc(r.a.collectionName)}</div>
           <div class="s muted">${year(r.a.firstDate)} · ${r.mine ? `your call (auto ${r.auto || '–'})` : `auto · ${r.rated}/${r.total} songs`}</div></a>
-        <span class="badge2 t-${r.final}">${r.final}</span></li>`).join('')}</ol>` : '<p class="muted">Rate some songs to see your ranking.</p>'}
+        <span class="badge2 t-${r.final}">${r.final}</span></li>`).join('')}</ol></div>` : '<p class="muted">Rate some songs to see your ranking.</p>'}
       ${unrated.length ? `<h2>Not rated yet</h2><div class="grid small-grid">${unrated.map(a => `<a class="card" href="#/album/${id}/${a.collectionId}">
         <img loading="lazy" src="${esc(art(a.artworkUrl100, 200))}" alt=""><div class="t">${esc(a.collectionName)}</div></a>`).join('')}</div>` : ''}`;
     $('#share').onclick = () => copyText(`My ${artist.artistName} album ranking\n` + ranked.map((r, i) => `${i + 1}. ${r.a.collectionName} (${r.final})`).join('\n'));
@@ -342,8 +301,8 @@ async function artistPage(id, tab = 'albums', sub) {
     const byTier = TIERS.map(T => [T, rated.filter(t => tierOf(st, 'songs', songKey(t)) === T)]).filter(([, xs]) => xs.length);
     el.innerHTML = `<div class="tools"><button id="share">Copy as tier list</button></div>
       <p class="muted">${rated.length} of ${songs.length} songs rated, grouped by tier. Tap a song to change its rating.</p>
-      ${byTier.map(([T, xs]) => `<h2 class="tierhead"><span class="badge2 t-${T}">${T}</span> <span class="muted">${xs.length}</span></h2>
-        <ul class="list">${xs.map(t => songRow(t, st, '', albumOf.get(songKey(t)).collectionName)).join('')}</ul>`).join('') || '<p class="muted">No songs rated yet.</p>'}`;
+      ${byTier.map(([T, xs]) => `<div class="tile tier-tile"><div class="tile-head"><h2 class="tierhead"><span class="badge2 t-${T}">${T}</span></h2><span class="eyebrow">${xs.length} songs</span></div>
+        <ul class="list">${xs.map(t => songRow(t, st, '', albumOf.get(songKey(t)).collectionName)).join('')}</ul></div>`).join('') || '<p class="muted">No songs rated yet.</p>'}`;
     el.querySelectorAll('.list').forEach(ul => wireSongRows(ul, songs, st));
     $('#share').onclick = () => copyText(`My ${artist.artistName} songs\n` + byTier.map(([T, xs]) => `${T}: ${xs.map(t => t.trackName).join(', ')}`).join('\n'));
   }
@@ -355,15 +314,14 @@ async function artistPage(id, tab = 'albums', sub) {
     const byKey = new Map(main.map(a => [albumKey(a), a]));
     const pts = main.map((a, i) => ({ a, ...ratings[i] }));
     el.innerHTML = `
-      <h2>Career arc</h2>
-      <p class="muted">Each album in release order, with its final rating (your override, or the average of its songs).</p>
-      ${arcChart(pts, id)}
-      ${prev ? `<h2>Movement since ${prev.day}</h2><ol class="rlist">${ranked.map((r, i) => {
+      <div class="tile"><div class="tile-head"><h2>Career arc</h2><span class="eyebrow">Final rating per album</span></div>
+      ${arcChart(pts, id)}</div>
+      ${prev ? `<div class="tile"><div class="tile-head"><h2>Movement</h2><span class="eyebrow">since ${prev.day}</span></div><ol class="rlist">${ranked.map((r, i) => {
         const was = prev.order.indexOf(albumKey(r.a));
         const mv = was < 0 ? '<span class="mv new">new</span>' : was > i ? `<span class="mv up">▲${was - i}</span>` : was < i ? `<span class="mv down">▼${i - was}</span>` : '<span class="mv">–</span>';
         return `<li><span class="rk">${i + 1}</span><img src="${esc(art(r.a.artworkUrl100, 100))}" alt=""><a href="#/album/${id}/${r.a.collectionId}">${esc(r.a.collectionName)}</a>
           <span class="badge2 t-${r.final}">${r.final}</span>${mv}</li>`;
-      }).join('')}</ol>` : ''}
+      }).join('')}</ol></div>` : ''}
       ${st.history.length > 1 ? `<h2>Your ranking by day</h2><div class="hist">${[...st.history].reverse().map(h => `
         <div class="hrow"><span class="muted">${h.day}</span><div class="hcovers">${h.order.slice(0, 10).map((k, i) => byKey.get(k) ? `<img title="${i + 1}. ${esc(byKey.get(k).collectionName)}" src="${esc(art(byKey.get(k).artworkUrl100, 100))}" alt="">` : '').join('')}</div></div>`).join('')}</div>`
         : '<p class="muted small">Come back on another day to see how your ranking moves.</p>'}`;
@@ -423,10 +381,9 @@ async function albumPage(artistId, cid) {
   const edLabel = (e, n) => n === 0 ? `Standard · ${e.trackCount}` : `Deluxe · ${e.trackCount}`;
   const ak = albumKey(album);
 
-  tint(album.artworkUrl100);
   const editionChips = new Set(editions.map(e => e.trackCount)).size > 1
     ? `<div class="chips">${[...new Map(editions.map(e => [e.trackCount, e])).values()].map((e, n) => `<a class="chipf ${e.trackCount === album.trackCount ? 'on' : ''}" href="#/album/${artistId}/${e.collectionId}">${edLabel(e, n)}</a>`).join('')}</div>` : '';
-  view.innerHTML = `${backdrop(album.artworkUrl100)}
+  view.innerHTML = `
     <div class="nav"><a href="#/artist/${artistId}">← ${esc(album.artistName)}</a>
       <span>${prev ? `<a href="#/album/${artistId}/${prev.collectionId}">‹ Prev</a>` : ''}${next ? `<a href="#/album/${artistId}/${next.collectionId}">Next ›</a>` : ''}</span></div>
     <section class="bento album-bento">
