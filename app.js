@@ -145,6 +145,47 @@ const listenLinks = (artistName, title, appleUrl) => {
     <a target="_blank" rel="noopener" href="https://music.youtube.com/search?q=${q}">YouTube Music</a></div>`;
 };
 
+// ---------- theme + album-art color ----------
+// ?theme=paper|night|art previews a theme (and remembers it).
+const qTheme = new URLSearchParams(location.search).get('theme');
+if (qTheme) { prefs.theme = qTheme; save(); }
+document.documentElement.dataset.theme = prefs.theme || 'art';
+const DEFAULT_ACCENT = getComputedStyle(document.documentElement).getPropertyValue('--accent');
+// Pick the most vibrant color from a tiny copy of the cover and make it readable on the dark base.
+const tintCache = {};
+async function tint(url) {
+  const root = document.documentElement.style;
+  if (!url || (prefs.theme || 'art') !== 'art') { root.removeProperty('--accent'); root.removeProperty('--accent-ink'); return; }
+  const small = art(url, 40);
+  let c = tintCache[small];
+  if (!c) {
+    try {
+      const img = new Image(); img.crossOrigin = 'anonymous'; img.src = small; await img.decode();
+      const cv = document.createElement('canvas'); cv.width = cv.height = 40;
+      const x = cv.getContext('2d'); x.drawImage(img, 0, 0, 40, 40);
+      const d = x.getImageData(0, 0, 40, 40).data; let best = null, bestScore = -1;
+      for (let i = 0; i < d.length; i += 4) {
+        const [h, s, l] = rgbToHsl(d[i], d[i + 1], d[i + 2]);
+        const score = s * (1 - Math.abs(l - .5) * 1.6);
+        if (score > bestScore) { bestScore = score; best = [h, s, l]; }
+      }
+      // Low-saturation covers (black & white art) fall back to the warm default.
+      c = tintCache[small] = best && best[1] > .25 ? `hsl(${Math.round(best[0] * 360)} ${Math.round(Math.min(.85, Math.max(.55, best[1])) * 100)}% 64%)` : null;
+    } catch { c = null; }
+  }
+  if (c) { root.setProperty('--accent', c); root.setProperty('--accent-ink', '#14100b'); }
+  else { root.removeProperty('--accent'); root.removeProperty('--accent-ink'); }
+}
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const dd = mx - mn, s = l > .5 ? dd / (2 - mx - mn) : dd / (mx + mn);
+  const h = mx === r ? (g - b) / dd + (g < b ? 6 : 0) : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4;
+  return [h / 6, s, l];
+}
+const backdrop = url => `<div class="backdrop" style="--art:url('${esc(art(url, 300))}')"></div>`;
+
 // ---------- optional preview player ----------
 const audio = $('#audio');
 let playing = null;
@@ -199,7 +240,8 @@ function wireSongRows(ul, tracks, st, after) {
 // ---------- views ----------
 function home() {
   const mine = Object.entries(store).filter(([k, s]) => k !== '_prefs' && s.name);
-  view.innerHTML = `<div class="empty"><h1>Listen anywhere.<br>Rate it here.</h1>
+  tint(null);
+  view.innerHTML = `<div class="empty"><h1>Listen anywhere.<br><em>Rate it here.</em></h1>
     <p class="muted">Pick an artist and play their albums wherever you listen. Tap S–F on each song as it plays.<br>
     Album ratings and rankings build themselves from your song ratings. Override any you disagree with.</p></div>
     ${mine.length ? `<h2>Your artists</h2><div class="grid">${mine.map(([id, s]) => `
@@ -207,6 +249,7 @@ function home() {
 }
 
 async function search(q) {
+  tint(null);
   view.innerHTML = `<p class="muted">Searching…</p>`;
   const d = await itunes('search', { term: q, entity: 'musicArtist', limit: 12 });
   if (!d.results.length) { view.innerHTML = `<p class="muted">No artists found for “${esc(q)}”.</p>`; return; }
@@ -246,9 +289,10 @@ async function artistPage(id, tab = 'albums', sub) {
   const pct = main.length ? Math.round((done / main.length) * 100) : 0;
   const nextUp = main.find((a, i) => !ratings[i].done);
 
-  view.innerHTML = `
+  tint(latest.artworkUrl100);
+  view.innerHTML = `${backdrop(latest.artworkUrl100)}
     <div class="hero"><a href="#/album/${id}/${latest.collectionId}"><img src="${esc(art(latest.artworkUrl100, 400))}" alt=""></a>
-      <div><div class="muted">Artist</div><h1>${esc(artist.artistName)}</h1>
+      <div><div class="eyebrow">Artist</div><h1>${esc(artist.artistName)}</h1>
       <div class="muted">Latest: <a href="#/album/${id}/${latest.collectionId}"><b>${esc(latest.collectionName)}</b></a> (${year(latest.firstDate)})</div>
       <div class="prog"><div style="width:${pct}%"></div></div>
       <div class="muted">${done} / ${main.length} ${unit} fully rated</div>
@@ -379,12 +423,13 @@ async function albumPage(artistId, cid) {
   const edLabel = (e, n) => n === 0 ? `Standard · ${e.trackCount}` : `Deluxe · ${e.trackCount}`;
   const ak = albumKey(album);
 
-  view.innerHTML = `<div class="nav"><a class="muted" href="#/artist/${artistId}">← ${esc(album.artistName)}</a>
+  tint(album.artworkUrl100);
+  view.innerHTML = `${backdrop(album.artworkUrl100)}<div class="nav"><a class="muted" href="#/artist/${artistId}">← ${esc(album.artistName)}</a>
       <span>${prev ? `<a class="muted" href="#/album/${artistId}/${prev.collectionId}">‹ Prev</a>` : ''}
       <span class="muted">${pos}</span>
       ${next ? `<a class="muted" href="#/album/${artistId}/${next.collectionId}">Next ›</a>` : ''}</span></div>
     <div class="hero"><img src="${esc(art(album.artworkUrl100, 600))}" alt="">
-      <div><div class="muted">${year(album.firstDate)} · ${tracks.length} songs · ${Math.round(total / 60000)} min</div>
+      <div><div class="eyebrow">${year(album.firstDate)} · ${tracks.length} songs · ${Math.round(total / 60000)} min</div>
       <h1>${esc(album.collectionName)}</h1>
       ${new Set(editions.map(e => e.trackCount)).size > 1 ? `<div class="chips">${[...new Map(editions.map(e => [e.trackCount, e])).values()].map((e, n) => `<a class="chipf ${e.trackCount === album.trackCount ? 'on' : ''}" href="#/album/${artistId}/${e.collectionId}">${edLabel(e, n)} songs</a>`).join('')}</div>` : ''}
       ${listenLinks(album.artistName, album.collectionName, album.collectionViewUrl)}</div></div>
@@ -397,7 +442,7 @@ async function albumPage(artistId, cid) {
   const renderVerdict = () => {
     const r = albumRating(st, album, tracks);
     $('#verdict').innerHTML = `
-      <div class="vrow"><div><div class="muted small">Album rating</div>
+      <div class="vrow"><div><div class="eyebrow">Album rating</div>
         <div class="vbig">${r.final ? `<span class="badge2 big t-${r.final}">${r.final}</span>` : '<span class="muted">–</span>'}
         <span class="muted">${r.mine ? `Your call · songs average ${r.auto || '–'}` : r.auto ? `Auto · average of ${r.rated}/${r.total} songs` : 'Rate songs to get an automatic album rating'}</span></div></div></div>
       <div class="muted small">${r.mine ? 'Tap your pick again to go back to the automatic rating.' : 'Disagree? Pick the album rating yourself:'}</div>
