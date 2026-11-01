@@ -123,7 +123,8 @@ h2{margin:32px 0 12px;font-size:20px}
 .hcovers{display:flex;gap:4px;overflow-x:auto}.hcovers img{width:40px;height:40px;border-radius:4px}
 @media(max-width:600px){
   .row{flex-wrap:wrap;row-gap:8px}
-  .row .info{flex:1 1 calc(100% - 110px)}
+  .row .info{flex:1 1 0}
+  .row .play{padding:8px 12px}
   .row .tierbtns{width:100%;justify-content:space-between}
   .row .tierbtns button{flex:1;height:36px;font-size:14px}
   .hero img{width:120px}
